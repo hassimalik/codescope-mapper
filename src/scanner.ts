@@ -1,4 +1,5 @@
-import type {SourceFile} from "./types/source-file.js"
+import type { SourceFile } from "./types/source-file.js";
+
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -18,6 +19,10 @@ const IGNORED_DIRECTORIES = new Set([
   "coverage",
 ]);
 
+const IGNORED_FILES = new Set([
+  "next-env.d.ts",
+]);
+
 export async function scanRepository(
   directory: string,
 ): Promise<SourceFile[]> {
@@ -32,6 +37,13 @@ export async function scanRepository(
       if (
         entry.isDirectory() &&
         IGNORED_DIRECTORIES.has(entry.name)
+      ) {
+        continue;
+      }
+
+      if (
+        entry.isFile() &&
+        IGNORED_FILES.has(entry.name)
       ) {
         continue;
       }
