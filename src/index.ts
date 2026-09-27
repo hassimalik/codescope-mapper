@@ -43,11 +43,7 @@ async function main() {
       );
     }
 
-    const relationships = extractRelationships(
-      ast,
-      file.path,
-      absolutePath,
-    );
+    const relationships = extractRelationships(ast, file.path, absolutePath);
 
     graph.relationships.push(...relationships);
 

@@ -1,5 +1,4 @@
-export type RelationshipType =
-  | "IMPORTS";
+export type RelationshipType = "IMPORTS";
 
 export interface CodeRelationship {
   from: string;

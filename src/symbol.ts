@@ -1,9 +1,5 @@
 export type SymbolType =
-  | "function"
-  | "class"
-  | "variable"
-  | "import"
-  | "export";
+  "function" | "class" | "variable" | "import" | "export";
 
 export interface SourceLocation {
   file: string;

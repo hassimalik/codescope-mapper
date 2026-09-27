@@ -3,41 +3,35 @@ import { CodeSymbol, SourceLocation, SymbolType } from "./symbol";
 
 export function extractSymbols(
   sourceFile: ts.SourceFile,
-  filePath: string
+  filePath: string,
 ): CodeSymbol[] {
   const symbols: CodeSymbol[] = [];
 
   function visit(node: ts.Node) {
     if (ts.isFunctionDeclaration(node) && node.name) {
-      symbols.push(createSymbol(
-        node.name.text,
-        "function",
-        node,
-        sourceFile,
-        filePath
-      ));
+      symbols.push(
+        createSymbol(node.name.text, "function", node, sourceFile, filePath),
+      );
     }
 
     if (ts.isClassDeclaration(node) && node.name) {
-      symbols.push(createSymbol(
-        node.name.text,
-        "class",
-        node,
-        sourceFile,
-        filePath
-      ));
+      symbols.push(
+        createSymbol(node.name.text, "class", node, sourceFile, filePath),
+      );
     }
 
     if (ts.isVariableStatement(node)) {
       for (const declaration of node.declarationList.declarations) {
         if (ts.isIdentifier(declaration.name)) {
-          symbols.push(createSymbol(
-            declaration.name.text,
-            "variable",
-            declaration,
-            sourceFile,
-            filePath
-          ));
+          symbols.push(
+            createSymbol(
+              declaration.name.text,
+              "variable",
+              declaration,
+              sourceFile,
+              filePath,
+            ),
+          );
         }
       }
     }
@@ -55,7 +49,7 @@ function createSymbol(
   type: SymbolType,
   node: ts.Node,
   sourceFile: ts.SourceFile,
-  filePath: string
+  filePath: string,
 ): CodeSymbol {
   const start = sourceFile.getLineAndCharacterOfPosition(node.getStart());
   const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
