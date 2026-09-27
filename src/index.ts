@@ -4,6 +4,8 @@ import { scanRepository } from "./scanner.js";
 import { readSourceFile } from "./reader.js";
 import { parseSourceFile } from "./parser.js";
 import { extractSymbols } from "./symbol-extractor.js";
+import { extractRelationships } from "./relationship-extractor.js";
+import { CodeGraph } from "./graph/code-graph.js";
 
 const args = process.argv.slice(2);
 const repositoryPath = args[0];
@@ -20,6 +22,11 @@ async function main() {
 
   console.log(`Found ${files.length} source files:\n`);
 
+  const graph: CodeGraph = {
+    nodes: [],
+    relationships: [],
+  };
+
   for (const file of files) {
     const source = await readSourceFile(file);
     const ast = parseSourceFile(file.path, source);
@@ -28,12 +35,32 @@ async function main() {
 
     const symbols = extractSymbols(ast, file.path);
 
+    graph.nodes.push(...symbols);
+
     for (const symbol of symbols) {
       console.log(
         `  ${symbol.type}: ${symbol.name} (line ${symbol.location.startLine})`,
       );
     }
+
+    const relationships = extractRelationships(
+      ast,
+      file.path,
+      absolutePath,
+    );
+
+    graph.relationships.push(...relationships);
+
+    for (const relationship of relationships) {
+      console.log(
+        `  ${relationship.type}: ${relationship.from} → ${relationship.to}`,
+      );
+    }
   }
+
+  console.log("\nCodeGraph");
+  console.log(`Nodes: ${graph.nodes.length}`);
+  console.log(`Relationships: ${graph.relationships.length}`);
 }
 
 main();
