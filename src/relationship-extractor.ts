@@ -11,6 +11,8 @@ export function extractRelationships(
 ): CodeRelationship[] {
   const relationships: CodeRelationship[] = [];
 
+  const relativeFilePath = path.relative(repositoryPath, filePath);
+
   function visit(node: ts.Node) {
     if (ts.isImportDeclaration(node)) {
       const moduleSpecifier = node.moduleSpecifier;
@@ -19,8 +21,12 @@ export function extractRelationships(
         const importPath = moduleSpecifier.text;
 
         relationships.push({
-          from: filePath,
-          to: resolveImport(importPath, filePath, repositoryPath),
+          from: relativeFilePath,
+          to: resolveImport(
+            importPath,
+            filePath,
+            repositoryPath,
+          ),
           type: "IMPORTS",
         });
       }
@@ -39,7 +45,6 @@ function resolveImport(
   currentFile: string,
   repositoryPath: string,
 ): string {
-  // External packages such as "react", "next", etc.
   if (!importPath.startsWith(".")) {
     return importPath;
   }
@@ -65,6 +70,5 @@ function resolveImport(
     }
   }
 
-  // If we couldn't resolve it, keep the original import.
   return importPath;
 }

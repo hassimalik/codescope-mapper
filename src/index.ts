@@ -6,6 +6,7 @@ import { parseSourceFile } from "./parser.js";
 import { extractSymbols } from "./symbol-extractor.js";
 import { extractRelationships } from "./relationship-extractor.js";
 import { CodeGraph } from "./graph/code-graph.js";
+import { CodeSymbol } from "./symbol.js";
 
 const args = process.argv.slice(2);
 const repositoryPath = args[0];
@@ -33,7 +34,27 @@ async function main() {
 
     console.log(`\n${file.relativePath}`);
 
-    const symbols = extractSymbols(ast, file.path);
+    const fileSymbol = {
+      id: file.relativePath,
+      name: file.relativePath,
+      type: "file" as CodeSymbol["type"],
+      location: {
+        file: file.relativePath,
+        startLine: 1,
+        startColumn: 1,
+        endLine: source.split("\n").length,
+        endColumn: 1,
+      },
+    } as CodeSymbol;
+
+    graph.nodes.push(fileSymbol);
+
+    console.log(`  file: ${file.relativePath}`);
+
+    const symbols = extractSymbols(
+      ast,
+      file.relativePath,
+    );
 
     graph.nodes.push(...symbols);
 
@@ -41,9 +62,19 @@ async function main() {
       console.log(
         `  ${symbol.type}: ${symbol.name} (line ${symbol.location.startLine})`,
       );
+
+      graph.relationships.push({
+        from: fileSymbol.id,
+        to: symbol.id,
+        type: "CONTAINS",
+      });
     }
 
-    const relationships = extractRelationships(ast, file.path, absolutePath);
+    const relationships = extractRelationships(
+      ast,
+      file.path,
+      absolutePath,
+    );
 
     graph.relationships.push(...relationships);
 

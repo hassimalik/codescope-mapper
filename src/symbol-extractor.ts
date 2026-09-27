@@ -1,5 +1,10 @@
 import ts from "typescript";
-import { CodeSymbol, SourceLocation, SymbolType } from "./symbol";
+
+import {
+  CodeSymbol,
+  SourceLocation,
+  SymbolType,
+} from "./symbol.js";
 
 export function extractSymbols(
   sourceFile: ts.SourceFile,
@@ -10,13 +15,25 @@ export function extractSymbols(
   function visit(node: ts.Node) {
     if (ts.isFunctionDeclaration(node) && node.name) {
       symbols.push(
-        createSymbol(node.name.text, "function", node, sourceFile, filePath),
+        createSymbol(
+          node.name.text,
+          "function",
+          node,
+          sourceFile,
+          filePath,
+        ),
       );
     }
 
     if (ts.isClassDeclaration(node) && node.name) {
       symbols.push(
-        createSymbol(node.name.text, "class", node, sourceFile, filePath),
+        createSymbol(
+          node.name.text,
+          "class",
+          node,
+          sourceFile,
+          filePath,
+        ),
       );
     }
 
@@ -51,8 +68,13 @@ function createSymbol(
   sourceFile: ts.SourceFile,
   filePath: string,
 ): CodeSymbol {
-  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+  const start = sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(),
+  );
+
+  const end = sourceFile.getLineAndCharacterOfPosition(
+    node.getEnd(),
+  );
 
   const location: SourceLocation = {
     file: filePath,
