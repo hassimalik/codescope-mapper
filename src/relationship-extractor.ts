@@ -22,11 +22,7 @@ export function extractRelationships(
 
         relationships.push({
           from: relativeFilePath,
-          to: resolveImport(
-            importPath,
-            filePath,
-            repositoryPath,
-          ),
+          to: resolveImport(importPath, filePath, repositoryPath),
           type: "IMPORTS",
         });
       }

@@ -51,10 +51,7 @@ async function main() {
 
     console.log(`  file: ${file.relativePath}`);
 
-    const symbols = extractSymbols(
-      ast,
-      file.relativePath,
-    );
+    const symbols = extractSymbols(ast, file.relativePath);
 
     graph.nodes.push(...symbols);
 
@@ -70,11 +67,7 @@ async function main() {
       });
     }
 
-    const relationships = extractRelationships(
-      ast,
-      file.path,
-      absolutePath,
-    );
+    const relationships = extractRelationships(ast, file.path, absolutePath);
 
     graph.relationships.push(...relationships);
 
