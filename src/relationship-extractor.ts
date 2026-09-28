@@ -49,14 +49,23 @@ function resolveImport(
 
   const possiblePaths = [
     path.resolve(currentDirectory, importPath),
+
     path.resolve(currentDirectory, `${importPath}.ts`),
+
     path.resolve(currentDirectory, `${importPath}.tsx`),
+
     path.resolve(currentDirectory, `${importPath}.js`),
+
     path.resolve(currentDirectory, `${importPath}.jsx`),
+
     path.resolve(currentDirectory, `${importPath}.css`),
+
     path.resolve(currentDirectory, importPath, "index.ts"),
+
     path.resolve(currentDirectory, importPath, "index.tsx"),
+
     path.resolve(currentDirectory, importPath, "index.js"),
+
     path.resolve(currentDirectory, importPath, "index.jsx"),
   ];
 
