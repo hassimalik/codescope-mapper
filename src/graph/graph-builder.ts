@@ -1,12 +1,19 @@
 import path from "node:path";
 
-import { scanRepository } from "../scanner.js";
-import { readSourceFile } from "../reader.js";
 import { parseSourceFile } from "../parser.js";
-import { extractSymbols } from "../symbol-extractor.js";
+import { readSourceFile } from "../reader.js";
 import { extractRelationships } from "../relationship-extractor.js";
-import { CodeGraph } from "./code-graph.js";
+import { scanRepository } from "../scanner.js";
 import { CodeSymbol } from "../symbol.js";
+import { extractSymbols } from "../symbol-extractor.js";
+import { CodeGraph } from "./code-graph.js";
+
+interface ParsedFile {
+  path: string;
+  relativePath: string;
+  source: string;
+  ast: ReturnType<typeof parseSourceFile>;
+}
 
 export async function buildCodeGraph(
   repositoryPath: string,
@@ -15,31 +22,43 @@ export async function buildCodeGraph(
 
   const files = await scanRepository(absolutePath);
 
+  const parsedFiles: ParsedFile[] = [];
+
+  for (const file of files) {
+    const source = await readSourceFile(file);
+
+    const ast = parseSourceFile(file.path, source);
+
+    parsedFiles.push({
+      path: file.path,
+      relativePath: file.relativePath,
+      source,
+      ast,
+    });
+  }
+
   const graph: CodeGraph = {
     nodes: [],
     relationships: [],
   };
 
-  for (const file of files) {
-    const source = await readSourceFile(file);
-    const ast = parseSourceFile(file.path, source);
-
+  for (const file of parsedFiles) {
     const fileSymbol: CodeSymbol = {
       id: file.relativePath,
       name: file.relativePath,
-      type: "file" as any,
+      type: "file",
       location: {
         file: file.relativePath,
         startLine: 1,
         startColumn: 1,
-        endLine: source.split("\n").length,
+        endLine: file.source.split("\n").length,
         endColumn: 1,
       },
     };
 
     graph.nodes.push(fileSymbol);
 
-    const symbols = extractSymbols(ast, file.relativePath);
+    const symbols = extractSymbols(file.ast, file.relativePath);
 
     graph.nodes.push(...symbols);
 
@@ -50,8 +69,15 @@ export async function buildCodeGraph(
         type: "CONTAINS",
       });
     }
+  }
 
-    const relationships = extractRelationships(ast, file.path, absolutePath);
+  for (const file of parsedFiles) {
+    const relationships = extractRelationships(
+      file.ast,
+      file.path,
+      absolutePath,
+      graph.nodes,
+    );
 
     graph.relationships.push(...relationships);
   }
