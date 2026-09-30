@@ -4,6 +4,7 @@ import ts from "typescript";
 
 import { CodeSymbol } from "./symbol.js";
 import { CodeRelationship } from "./types/relationships.js";
+
 interface ImportBinding {
   localName: string;
   targetSymbol: CodeSymbol;
@@ -17,7 +18,10 @@ export function extractRelationships(
 ): CodeRelationship[] {
   const relationships: CodeRelationship[] = [];
 
-  const relativeFilePath = path.relative(repositoryPath, filePath);
+  const relativeFilePath = path.relative(
+    repositoryPath,
+    filePath,
+  );
 
   const importBindings = getImportBindings(
     sourceFile,
@@ -38,7 +42,9 @@ export function extractRelationships(
     ts.forEachChild(node, visit);
   }
 
-  function handleImport(node: ts.ImportDeclaration) {
+  function handleImport(
+    node: ts.ImportDeclaration,
+  ) {
     const moduleSpecifier = node.moduleSpecifier;
 
     if (!ts.isStringLiteral(moduleSpecifier)) {
@@ -47,7 +53,11 @@ export function extractRelationships(
 
     const importPath = moduleSpecifier.text;
 
-    const resolvedImport = resolveImport(importPath, filePath, repositoryPath);
+    const resolvedImport = resolveImport(
+      importPath,
+      filePath,
+      repositoryPath,
+    );
 
     relationships.push({
       from: relativeFilePath,
@@ -59,7 +69,8 @@ export function extractRelationships(
       return;
     }
 
-    const importedSymbols = getImportedSymbols(node);
+    const importedSymbols =
+      getImportedSymbols(node);
 
     for (const importedSymbol of importedSymbols) {
       const targetSymbol = knownSymbols.find(
@@ -80,7 +91,9 @@ export function extractRelationships(
     }
   }
 
-  function handleCall(node: ts.CallExpression) {
+  function handleCall(
+    node: ts.CallExpression,
+  ) {
     if (!ts.isIdentifier(node.expression)) {
       return;
     }
@@ -139,7 +152,8 @@ function resolveCallTarget(
   }
 
   const importedBinding = importBindings.find(
-    (binding) => binding.localName === calledName,
+    (binding) =>
+      binding.localName === calledName,
   );
 
   return importedBinding?.targetSymbol;
@@ -158,7 +172,8 @@ function getImportBindings(
       continue;
     }
 
-    const moduleSpecifier = statement.moduleSpecifier;
+    const moduleSpecifier =
+      statement.moduleSpecifier;
 
     if (!ts.isStringLiteral(moduleSpecifier)) {
       continue;
@@ -170,43 +185,57 @@ function getImportBindings(
       continue;
     }
 
-    const resolvedImport = resolveImport(importPath, filePath, repositoryPath);
+    const resolvedImport = resolveImport(
+      importPath,
+      filePath,
+      repositoryPath,
+    );
 
-    const importClause = statement.importClause;
+    const importClause =
+      statement.importClause;
 
     if (!importClause) {
       continue;
     }
 
     if (importClause.name) {
+      const importedDefaultName = importClause.name.text;
       const targetSymbol = knownSymbols.find(
         (symbol) =>
-          symbol.location.file === resolvedImport &&
-          symbol.name === importClause.name!.text,
+          symbol.location.file ===
+            resolvedImport &&
+          symbol.name === importedDefaultName,
       );
 
       if (targetSymbol) {
         bindings.push({
-          localName: importClause.name.text,
+          localName: importedDefaultName,
           targetSymbol,
         });
       }
     }
 
-    const namedBindings = importClause.namedBindings;
+    const namedBindings =
+      importClause.namedBindings;
 
-    if (!namedBindings || !ts.isNamedImports(namedBindings)) {
+    if (
+      !namedBindings ||
+      !ts.isNamedImports(namedBindings)
+    ) {
       continue;
     }
 
     for (const element of namedBindings.elements) {
-      const importedName = element.propertyName?.text ?? element.name.text;
+      const importedName =
+        element.propertyName?.text ??
+        element.name.text;
 
       const localName = element.name.text;
 
       const targetSymbol = knownSymbols.find(
         (symbol) =>
-          symbol.location.file === resolvedImport &&
+          symbol.location.file ===
+            resolvedImport &&
           symbol.name === importedName,
       );
 
@@ -230,31 +259,52 @@ function findContainingFunction(
   relativeFilePath: string,
   knownSymbols: CodeSymbol[],
 ): CodeSymbol | undefined {
-  const position = getNodeLocation(node, sourceFile, relativeFilePath);
+  const position = getNodeLocation(
+    node,
+    sourceFile,
+    relativeFilePath,
+  );
 
-  const candidates = knownSymbols.filter((symbol) => {
-    if (symbol.type !== "function") {
-      return false;
-    }
+  const candidates = knownSymbols.filter(
+    (symbol) => {
+      if (symbol.type !== "function") {
+        return false;
+      }
 
-    if (symbol.location.file !== relativeFilePath) {
-      return false;
-    }
+      if (
+        symbol.location.file !==
+        relativeFilePath
+      ) {
+        return false;
+      }
 
-    return isLocationInside(position, symbol);
-  });
+      return isLocationInside(
+        position,
+        symbol,
+      );
+    },
+  );
 
-  candidates.sort((a, b) => getLocationSize(a) - getLocationSize(b));
+  candidates.sort(
+    (a, b) =>
+      getLocationSize(a) -
+      getLocationSize(b),
+  );
 
   return candidates[0];
 }
 
-function getLocationSize(symbol: CodeSymbol): number {
+function getLocationSize(
+  symbol: CodeSymbol,
+): number {
   const location = symbol.location;
 
   return (
-    (location.endLine - location.startLine) * 1000 +
-    (location.endColumn - location.startColumn)
+    (location.endLine -
+      location.startLine) *
+      1000 +
+    (location.endColumn -
+      location.startColumn)
   );
 }
 
@@ -263,11 +313,15 @@ function getNodeLocation(
   sourceFile: ts.SourceFile,
   filePath: string,
 ) {
-  const start = sourceFile.getLineAndCharacterOfPosition(
-    node.getStart(sourceFile),
-  );
+  const start =
+    sourceFile.getLineAndCharacterOfPosition(
+      node.getStart(sourceFile),
+    );
 
-  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
+  const end =
+    sourceFile.getLineAndCharacterOfPosition(
+      node.getEnd(),
+    );
 
   return {
     file: filePath,
@@ -290,19 +344,30 @@ function isLocationInside(
   const symbolLocation = symbol.location;
 
   const startsAfterSymbol =
-    location.startLine > symbolLocation.startLine ||
-    (location.startLine === symbolLocation.startLine &&
-      location.startColumn >= symbolLocation.startColumn);
+    location.startLine >
+      symbolLocation.startLine ||
+    (location.startLine ===
+      symbolLocation.startLine &&
+      location.startColumn >=
+        symbolLocation.startColumn);
 
   const endsBeforeSymbol =
-    location.endLine < symbolLocation.endLine ||
-    (location.endLine === symbolLocation.endLine &&
-      location.endColumn <= symbolLocation.endColumn);
+    location.endLine <
+      symbolLocation.endLine ||
+    (location.endLine ===
+      symbolLocation.endLine &&
+      location.endColumn <=
+        symbolLocation.endColumn);
 
-  return startsAfterSymbol && endsBeforeSymbol;
+  return (
+    startsAfterSymbol &&
+    endsBeforeSymbol
+  );
 }
 
-function getImportedSymbols(node: ts.ImportDeclaration): string[] {
+function getImportedSymbols(
+  node: ts.ImportDeclaration,
+): string[] {
   const importClause = node.importClause;
 
   if (!importClause) {
@@ -315,18 +380,27 @@ function getImportedSymbols(node: ts.ImportDeclaration): string[] {
     symbols.push(importClause.name.text);
   }
 
-  const namedBindings = importClause.namedBindings;
+  const namedBindings =
+    importClause.namedBindings;
 
-  if (namedBindings && ts.isNamedImports(namedBindings)) {
+  if (
+    namedBindings &&
+    ts.isNamedImports(namedBindings)
+  ) {
     for (const element of namedBindings.elements) {
-      symbols.push(element.propertyName?.text ?? element.name.text);
+      symbols.push(
+        element.propertyName?.text ??
+          element.name.text,
+      );
     }
   }
 
   return symbols;
 }
 
-function isLocalImport(importPath: string): boolean {
+function isLocalImport(
+  importPath: string,
+): boolean {
   return importPath.startsWith(".");
 }
 
@@ -339,24 +413,62 @@ function resolveImport(
     return importPath;
   }
 
-  const currentDirectory = path.dirname(currentFile);
+  const currentDirectory =
+    path.dirname(currentFile);
 
   const possiblePaths = [
-    path.resolve(currentDirectory, importPath),
-    path.resolve(currentDirectory, `${importPath}.ts`),
-    path.resolve(currentDirectory, `${importPath}.tsx`),
-    path.resolve(currentDirectory, `${importPath}.js`),
-    path.resolve(currentDirectory, `${importPath}.jsx`),
-    path.resolve(currentDirectory, `${importPath}.css`),
-    path.resolve(currentDirectory, importPath, "index.ts"),
-    path.resolve(currentDirectory, importPath, "index.tsx"),
-    path.resolve(currentDirectory, importPath, "index.js"),
-    path.resolve(currentDirectory, importPath, "index.jsx"),
+    path.resolve(
+      currentDirectory,
+      importPath,
+    ),
+    path.resolve(
+      currentDirectory,
+      `${importPath}.ts`,
+    ),
+    path.resolve(
+      currentDirectory,
+      `${importPath}.tsx`,
+    ),
+    path.resolve(
+      currentDirectory,
+      `${importPath}.js`,
+    ),
+    path.resolve(
+      currentDirectory,
+      `${importPath}.jsx`,
+    ),
+    path.resolve(
+      currentDirectory,
+      `${importPath}.css`,
+    ),
+    path.resolve(
+      currentDirectory,
+      importPath,
+      "index.ts",
+    ),
+    path.resolve(
+      currentDirectory,
+      importPath,
+      "index.tsx",
+    ),
+    path.resolve(
+      currentDirectory,
+      importPath,
+      "index.js",
+    ),
+    path.resolve(
+      currentDirectory,
+      importPath,
+      "index.jsx",
+    ),
   ];
 
   for (const possiblePath of possiblePaths) {
     if (fs.existsSync(possiblePath)) {
-      return path.relative(repositoryPath, possiblePath);
+      return path.relative(
+        repositoryPath,
+        possiblePath,
+      );
     }
   }
 
