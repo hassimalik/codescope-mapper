@@ -4,6 +4,7 @@ import ts from "typescript";
 
 import { CodeSymbol } from "./symbol.js";
 import { CodeRelationship } from "./types/relationships.js";
+
 interface ImportBinding {
   localName: string;
   targetSymbol: CodeSymbol;
@@ -179,15 +180,16 @@ function getImportBindings(
     }
 
     if (importClause.name) {
+      const importedDefaultName = importClause.name.text;
       const targetSymbol = knownSymbols.find(
         (symbol) =>
           symbol.location.file === resolvedImport &&
-          symbol.name === importClause.name!.text,
+          symbol.name === importedDefaultName,
       );
 
       if (targetSymbol) {
         bindings.push({
-          localName: importClause.name.text,
+          localName: importedDefaultName,
           targetSymbol,
         });
       }
