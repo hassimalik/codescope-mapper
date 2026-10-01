@@ -82,11 +82,11 @@ export function extractRelationships(
   }
 
   function handleCall(node: ts.CallExpression) {
-    if (!ts.isIdentifier(node.expression)) {
+    const calledName = getCalledName(node);
+
+    if (!calledName) {
       return;
     }
-
-    const calledName = node.expression.text;
 
     const caller = findContainingFunction(
       node,
@@ -120,6 +120,20 @@ export function extractRelationships(
   visit(sourceFile);
 
   return relationships;
+}
+
+function getCalledName(node: ts.CallExpression): string | undefined {
+  const expression = node.expression;
+
+  if (ts.isIdentifier(expression)) {
+    return expression.text;
+  }
+
+  if (ts.isPropertyAccessExpression(expression)) {
+    return expression.name.text;
+  }
+
+  return undefined;
 }
 
 function resolveCallTarget(
@@ -181,6 +195,7 @@ function getImportBindings(
 
     if (importClause.name) {
       const importedDefaultName = importClause.name.text;
+
       const targetSymbol = knownSymbols.find(
         (symbol) =>
           symbol.location.file === resolvedImport &&

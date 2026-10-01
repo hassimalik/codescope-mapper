@@ -7,6 +7,7 @@ import { scanRepository } from "../scanner.js";
 import { CodeSymbol } from "../symbol.js";
 import { extractSymbols } from "../symbol-extractor.js";
 import { CodeGraph } from "./code-graph.js";
+import { validateCodeGraph } from "./graph-validator.js";
 
 interface ParsedFile {
   path: string;
@@ -80,6 +81,17 @@ export async function buildCodeGraph(
     );
 
     graph.relationships.push(...relationships);
+  }
+
+  const validationErrors = validateCodeGraph(graph);
+
+  if (validationErrors.length > 0) {
+    throw new Error(
+      [
+        "CodeGraph validation failed:",
+        ...validationErrors.map((error) => `- ${error}`),
+      ].join("\n"),
+    );
   }
 
   return graph;
