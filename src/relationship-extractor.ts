@@ -39,14 +39,10 @@ export function extractRelationships(
     repositoryPath,
   );
 
-  function addRelationship(
-    relationship: CodeRelationship,
-  ): void {
-    const key = [
-      relationship.from,
-      relationship.type,
-      relationship.to,
-    ].join("|");
+  function addRelationship(relationship: CodeRelationship): void {
+    const key = [relationship.from, relationship.type, relationship.to].join(
+      "|",
+    );
 
     if (relationshipKeys.has(key)) {
       return;
@@ -81,11 +77,7 @@ export function extractRelationships(
 
     const importPath = moduleSpecifier.text;
 
-    const resolvedImport = resolveImport(
-      importPath,
-      filePath,
-      repositoryPath,
-    );
+    const resolvedImport = resolveImport(importPath, filePath, repositoryPath);
 
     addRelationship({
       from: relativeFilePath,
@@ -133,22 +125,16 @@ export function extractRelationships(
 
     const resolvedExport =
       moduleSpecifier && ts.isStringLiteral(moduleSpecifier)
-        ? resolveImport(
-            moduleSpecifier.text,
-            filePath,
-            repositoryPath,
-          )
+        ? resolveImport(moduleSpecifier.text, filePath, repositoryPath)
         : relativeFilePath;
 
     for (const element of exportClause.elements) {
       const exportedName = element.name.text;
-      const localName =
-        element.propertyName?.text ?? exportedName;
+      const localName = element.propertyName?.text ?? exportedName;
 
       const targetSymbol = knownSymbols.find(
         (symbol) =>
-          symbol.location.file === resolvedExport &&
-          symbol.name === localName,
+          symbol.location.file === resolvedExport && symbol.name === localName,
       );
 
       if (!targetSymbol) {
@@ -243,8 +229,7 @@ function resolveCallTarget(
       if (namespaceBinding) {
         const namespaceTarget = knownSymbols.find(
           (symbol) =>
-            symbol.location.file ===
-              namespaceBinding.sourceFile &&
+            symbol.location.file === namespaceBinding.sourceFile &&
             symbol.name === propertyName,
         );
 
@@ -300,11 +285,7 @@ function getImportBindings(
       continue;
     }
 
-    const resolvedImport = resolveImport(
-      importPath,
-      filePath,
-      repositoryPath,
-    );
+    const resolvedImport = resolveImport(importPath, filePath, repositoryPath);
 
     const importClause = statement.importClause;
 
@@ -336,8 +317,7 @@ function getImportBindings(
     }
 
     for (const element of namedBindings.elements) {
-      const importedName =
-        element.propertyName?.text ?? element.name.text;
+      const importedName = element.propertyName?.text ?? element.name.text;
 
       const localName = element.name.text;
 
@@ -393,20 +373,13 @@ function getNamespaceImportBindings(
 
     const namedBindings = importClause.namedBindings;
 
-    if (
-      !namedBindings ||
-      !ts.isNamespaceImport(namedBindings)
-    ) {
+    if (!namedBindings || !ts.isNamespaceImport(namedBindings)) {
       continue;
     }
 
     bindings.push({
       localName: namedBindings.name.text,
-      sourceFile: resolveImport(
-        importPath,
-        filePath,
-        repositoryPath,
-      ),
+      sourceFile: resolveImport(importPath, filePath, repositoryPath),
     });
   }
 
@@ -419,11 +392,7 @@ function findContainingFunction(
   relativeFilePath: string,
   knownSymbols: CodeSymbol[],
 ): CodeSymbol | undefined {
-  const position = getNodeLocation(
-    node,
-    sourceFile,
-    relativeFilePath,
-  );
+  const position = getNodeLocation(node, sourceFile, relativeFilePath);
 
   const candidates = knownSymbols.filter((symbol) => {
     if (symbol.type !== "function") {
@@ -437,9 +406,7 @@ function findContainingFunction(
     return isLocationInside(position, symbol);
   });
 
-  candidates.sort(
-    (a, b) => getLocationSize(a) - getLocationSize(b),
-  );
+  candidates.sort((a, b) => getLocationSize(a) - getLocationSize(b));
 
   return candidates[0];
 }
@@ -462,9 +429,7 @@ function getNodeLocation(
     node.getStart(sourceFile),
   );
 
-  const end = sourceFile.getLineAndCharacterOfPosition(
-    node.getEnd(),
-  );
+  const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
 
   return {
     file: filePath,
@@ -499,9 +464,7 @@ function isLocationInside(
   return startsAfterSymbol && endsBeforeSymbol;
 }
 
-function getImportedSymbols(
-  node: ts.ImportDeclaration,
-): string[] {
+function getImportedSymbols(node: ts.ImportDeclaration): string[] {
   const importClause = node.importClause;
 
   if (!importClause) {
@@ -518,9 +481,7 @@ function getImportedSymbols(
 
   if (namedBindings && ts.isNamedImports(namedBindings)) {
     for (const element of namedBindings.elements) {
-      symbols.push(
-        element.propertyName?.text ?? element.name.text,
-      );
+      symbols.push(element.propertyName?.text ?? element.name.text);
     }
   }
 
@@ -549,26 +510,10 @@ function resolveImport(
     path.resolve(currentDirectory, `${importPath}.js`),
     path.resolve(currentDirectory, `${importPath}.jsx`),
     path.resolve(currentDirectory, `${importPath}.css`),
-    path.resolve(
-      currentDirectory,
-      importPath,
-      "index.ts",
-    ),
-    path.resolve(
-      currentDirectory,
-      importPath,
-      "index.tsx",
-    ),
-    path.resolve(
-      currentDirectory,
-      importPath,
-      "index.js",
-    ),
-    path.resolve(
-      currentDirectory,
-      importPath,
-      "index.jsx",
-    ),
+    path.resolve(currentDirectory, importPath, "index.ts"),
+    path.resolve(currentDirectory, importPath, "index.tsx"),
+    path.resolve(currentDirectory, importPath, "index.js"),
+    path.resolve(currentDirectory, importPath, "index.jsx"),
   ];
 
   for (const possiblePath of possiblePaths) {
@@ -579,4 +524,3 @@ function resolveImport(
 
   return importPath;
 }
-

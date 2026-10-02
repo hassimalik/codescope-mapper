@@ -1,10 +1,5 @@
 import { strict as assert } from "node:assert";
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -607,22 +602,13 @@ test("extracts an EXPORTS relationship for a re-exported symbol", () => {
   }
 });
 
-
 test("resolves namespace imports when extracting CALLS relationships", () => {
-  const repositoryPath = mkdtempSync(
-    path.join(tmpdir(), "relationship-test-"),
-  );
+  const repositoryPath = mkdtempSync(path.join(tmpdir(), "relationship-test-"));
 
   try {
-    const utilsPath = path.join(
-      repositoryPath,
-      "utils.ts",
-    );
+    const utilsPath = path.join(repositoryPath, "utils.ts");
 
-    const mainPath = path.join(
-      repositoryPath,
-      "main.ts",
-    );
+    const mainPath = path.join(repositoryPath, "main.ts");
 
     writeFileSync(
       utilsPath,
@@ -697,21 +683,18 @@ export function main() {
       knownSymbols,
     );
 
-    assert.deepEqual(
-      relationships,
-      [
-        {
-          from: "main.ts",
-          to: "utils.ts",
-          type: "IMPORTS",
-        },
-        {
-          from: "main.ts:main:3",
-          to: "utils.ts:getGreeting:1",
-          type: "CALLS",
-        },
-      ],
-    );
+    assert.deepEqual(relationships, [
+      {
+        from: "main.ts",
+        to: "utils.ts",
+        type: "IMPORTS",
+      },
+      {
+        from: "main.ts:main:3",
+        to: "utils.ts:getGreeting:1",
+        type: "CALLS",
+      },
+    ]);
 
     void utilsSourceFile;
   } finally {
@@ -722,22 +705,13 @@ export function main() {
   }
 });
 
-
 test("extracts EXPORTS relationships for export-star declarations", () => {
-  const repositoryPath = mkdtempSync(
-    path.join(tmpdir(), "relationship-test-"),
-  );
+  const repositoryPath = mkdtempSync(path.join(tmpdir(), "relationship-test-"));
 
   try {
-    const utilsPath = path.join(
-      repositoryPath,
-      "utils.ts",
-    );
+    const utilsPath = path.join(repositoryPath, "utils.ts");
 
-    const indexPath = path.join(
-      repositoryPath,
-      "index.ts",
-    );
+    const indexPath = path.join(repositoryPath, "index.ts");
 
     writeFileSync(
       utilsPath,
@@ -787,21 +761,18 @@ export * from "./utils";
       knownSymbols,
     );
 
-    assert.deepEqual(
-      relationships,
-      [
-        {
-          from: "index.ts",
-          to: "utils.ts",
-          type: "IMPORTS",
-        },
-        {
-          from: "index.ts",
-          to: "utils.ts:getGreeting:1",
-          type: "EXPORTS",
-        },
-      ],
-    );
+    assert.deepEqual(relationships, [
+      {
+        from: "index.ts",
+        to: "utils.ts",
+        type: "IMPORTS",
+      },
+      {
+        from: "index.ts",
+        to: "utils.ts:getGreeting:1",
+        type: "EXPORTS",
+      },
+    ]);
   } finally {
     rmSync(repositoryPath, {
       recursive: true,
@@ -809,4 +780,3 @@ export * from "./utils";
     });
   }
 });
-
