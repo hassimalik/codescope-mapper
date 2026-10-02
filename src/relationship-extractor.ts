@@ -10,6 +10,11 @@ interface ImportBinding {
   targetSymbol: CodeSymbol;
 }
 
+interface NamespaceImportBinding {
+  localName: string;
+  sourceFile: string;
+}
+
 export function extractRelationships(
   sourceFile: ts.SourceFile,
   filePath: string,
@@ -17,6 +22,7 @@ export function extractRelationships(
   knownSymbols: CodeSymbol[],
 ): CodeRelationship[] {
   const relationships: CodeRelationship[] = [];
+  const relationshipKeys = new Set<string>();
 
   const relativeFilePath = path.relative(repositoryPath, filePath);
 
@@ -27,9 +33,32 @@ export function extractRelationships(
     knownSymbols,
   );
 
+  const namespaceImportBindings = getNamespaceImportBindings(
+    sourceFile,
+    filePath,
+    repositoryPath,
+  );
+
+  function addRelationship(relationship: CodeRelationship): void {
+    const key = [relationship.from, relationship.type, relationship.to].join(
+      "|",
+    );
+
+    if (relationshipKeys.has(key)) {
+      return;
+    }
+
+    relationshipKeys.add(key);
+    relationships.push(relationship);
+  }
+
   function visit(node: ts.Node) {
     if (ts.isImportDeclaration(node)) {
       handleImport(node);
+    }
+
+    if (ts.isExportDeclaration(node)) {
+      handleExport(node);
     }
 
     if (ts.isCallExpression(node)) {
@@ -50,7 +79,7 @@ export function extractRelationships(
 
     const resolvedImport = resolveImport(importPath, filePath, repositoryPath);
 
-    relationships.push({
+    addRelationship({
       from: relativeFilePath,
       to: resolvedImport,
       type: "IMPORTS",
@@ -73,7 +102,7 @@ export function extractRelationships(
         continue;
       }
 
-      relationships.push({
+      addRelationship({
         from: relativeFilePath,
         to: targetSymbol.id,
         type: "REFERENCES",
@@ -81,13 +110,46 @@ export function extractRelationships(
     }
   }
 
-  function handleCall(node: ts.CallExpression) {
-    const calledName = getCalledName(node);
+  function handleExport(node: ts.ExportDeclaration) {
+    const exportClause = node.exportClause;
 
-    if (!calledName) {
+    if (!exportClause || !ts.isNamedExports(exportClause)) {
       return;
     }
 
+    const moduleSpecifier = node.moduleSpecifier;
+
+    if (moduleSpecifier && !ts.isStringLiteral(moduleSpecifier)) {
+      return;
+    }
+
+    const resolvedExport =
+      moduleSpecifier && ts.isStringLiteral(moduleSpecifier)
+        ? resolveImport(moduleSpecifier.text, filePath, repositoryPath)
+        : relativeFilePath;
+
+    for (const element of exportClause.elements) {
+      const exportedName = element.name.text;
+      const localName = element.propertyName?.text ?? exportedName;
+
+      const targetSymbol = knownSymbols.find(
+        (symbol) =>
+          symbol.location.file === resolvedExport && symbol.name === localName,
+      );
+
+      if (!targetSymbol) {
+        continue;
+      }
+
+      addRelationship({
+        from: relativeFilePath,
+        to: targetSymbol.id,
+        type: "EXPORTS",
+      });
+    }
+  }
+
+  function handleCall(node: ts.CallExpression) {
     const caller = findContainingFunction(
       node,
       sourceFile,
@@ -100,17 +162,18 @@ export function extractRelationships(
     }
 
     const targetSymbol = resolveCallTarget(
-      calledName,
+      node,
       relativeFilePath,
       knownSymbols,
       importBindings,
+      namespaceImportBindings,
     );
 
     if (!targetSymbol) {
       return;
     }
 
-    relationships.push({
+    addRelationship({
       from: caller.id,
       to: targetSymbol.id,
       type: "CALLS",
@@ -122,42 +185,79 @@ export function extractRelationships(
   return relationships;
 }
 
-function getCalledName(node: ts.CallExpression): string | undefined {
-  const expression = node.expression;
-
-  if (ts.isIdentifier(expression)) {
-    return expression.text;
-  }
-
-  if (ts.isPropertyAccessExpression(expression)) {
-    return expression.name.text;
-  }
-
-  return undefined;
-}
-
 function resolveCallTarget(
-  calledName: string,
+  node: ts.CallExpression,
   relativeFilePath: string,
   knownSymbols: CodeSymbol[],
   importBindings: ImportBinding[],
+  namespaceImportBindings: NamespaceImportBinding[],
 ): CodeSymbol | undefined {
-  const localSymbol = knownSymbols.find(
-    (symbol) =>
-      symbol.type === "function" &&
-      symbol.location.file === relativeFilePath &&
-      symbol.name === calledName,
-  );
+  const expression = node.expression;
 
-  if (localSymbol) {
-    return localSymbol;
+  if (ts.isIdentifier(expression)) {
+    const calledName = expression.text;
+
+    const localSymbol = knownSymbols.find(
+      (symbol) =>
+        symbol.type === "function" &&
+        symbol.location.file === relativeFilePath &&
+        symbol.name === calledName,
+    );
+
+    if (localSymbol) {
+      return localSymbol;
+    }
+
+    const importedBinding = importBindings.find(
+      (binding) => binding.localName === calledName,
+    );
+
+    return importedBinding?.targetSymbol;
   }
 
-  const importedBinding = importBindings.find(
-    (binding) => binding.localName === calledName,
-  );
+  if (ts.isPropertyAccessExpression(expression)) {
+    const propertyName = expression.name.text;
+    const receiver = expression.expression;
 
-  return importedBinding?.targetSymbol;
+    if (ts.isIdentifier(receiver)) {
+      const namespaceBinding = namespaceImportBindings.find(
+        (binding) =>
+          binding.localName === receiver.text &&
+          binding.sourceFile !== relativeFilePath,
+      );
+
+      if (namespaceBinding) {
+        const namespaceTarget = knownSymbols.find(
+          (symbol) =>
+            symbol.location.file === namespaceBinding.sourceFile &&
+            symbol.name === propertyName,
+        );
+
+        if (namespaceTarget) {
+          return namespaceTarget;
+        }
+      }
+    }
+
+    const localSymbol = knownSymbols.find(
+      (symbol) =>
+        symbol.type === "function" &&
+        symbol.location.file === relativeFilePath &&
+        symbol.name === propertyName,
+    );
+
+    if (localSymbol) {
+      return localSymbol;
+    }
+
+    const importedBinding = importBindings.find(
+      (binding) => binding.localName === propertyName,
+    );
+
+    return importedBinding?.targetSymbol;
+  }
+
+  return undefined;
 }
 
 function getImportBindings(
@@ -236,6 +336,51 @@ function getImportBindings(
         targetSymbol,
       });
     }
+  }
+
+  return bindings;
+}
+
+function getNamespaceImportBindings(
+  sourceFile: ts.SourceFile,
+  filePath: string,
+  repositoryPath: string,
+): NamespaceImportBinding[] {
+  const bindings: NamespaceImportBinding[] = [];
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      continue;
+    }
+
+    const moduleSpecifier = statement.moduleSpecifier;
+
+    if (!ts.isStringLiteral(moduleSpecifier)) {
+      continue;
+    }
+
+    const importPath = moduleSpecifier.text;
+
+    if (!isLocalImport(importPath)) {
+      continue;
+    }
+
+    const importClause = statement.importClause;
+
+    if (!importClause) {
+      continue;
+    }
+
+    const namedBindings = importClause.namedBindings;
+
+    if (!namedBindings || !ts.isNamespaceImport(namedBindings)) {
+      continue;
+    }
+
+    bindings.push({
+      localName: namedBindings.name.text,
+      sourceFile: resolveImport(importPath, filePath, repositoryPath),
+    });
   }
 
   return bindings;
