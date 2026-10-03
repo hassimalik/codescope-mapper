@@ -1,4 +1,4 @@
-# Codescope-mapper
+# CodeScope-mapper
 
 Codescope Mapper is a lightweight JavaScript/TypeScript repository mapper for understanding how a codebase is structured and how features connect to one another.
 

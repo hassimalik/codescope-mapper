@@ -61,10 +61,10 @@ function color(text: string, ...styles: readonly string[]): string {
 }
 
 function printUsage(): void {
-  console.log(`Codescope Mapper
+  console.log(`codescope Mapper
 
 Usage:
-  Codescope-mapper <repository-path> [options]
+  codescope-mapper <repository-path> [options]
 
 Options:
   --graph                  Print the raw graph summary
