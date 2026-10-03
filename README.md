@@ -1,6 +1,6 @@
-# codeflow-mapper
+# Codescope-mapper
 
-Codeflow Mapper is a lightweight JavaScript/TypeScript repository mapper for understanding how a codebase is structured and how features connect to one another.
+Codescope Mapper is a lightweight JavaScript/TypeScript repository mapper for understanding how a codebase is structured and how features connect to one another.
 
 It scans a repository, extracts files and symbols, builds a graph of imports, calls, references, and exports, and then groups those artifacts into higher-level feature clusters.
 
@@ -36,13 +36,13 @@ node dist/index.js /path/to/repository
 ## CLI options
 
 ```bash
-codeflow-mapper /path/to/repository --summary
-codeflow-mapper /path/to/repository --graph
-codeflow-mapper /path/to/repository --json
-codeflow-mapper /path/to/repository --format text
-codeflow-mapper /path/to/repository --max-depth 5
-codeflow-mapper /path/to/repository --color always
-codeflow-mapper --help
+codescope-mapper /path/to/repository --summary
+codescope-mapper /path/to/repository --graph
+codescope-mapper /path/to/repository --json
+codescope-mapper /path/to/repository --format text
+codescope-mapper /path/to/repository --max-depth 5
+codescope-mapper /path/to/repository --color always
+codescope-mapper --help
 ```
 
 ## Example output
@@ -68,7 +68,7 @@ Feature relationships: 8
 ## Example JSON output
 
 ```bash
-codeflow-mapper ./my-app --json
+codescope-mapper ./my-app --json
 ```
 
 This returns a JSON payload with:

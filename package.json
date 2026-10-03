@@ -1,11 +1,11 @@
 {
-  "name": "codeflow-mapper",
+  "name": "codescope-mapper",
   "version": "0.1.0",
   "description": "Maps JavaScript and TypeScript codebases into a feature-aware dependency graph for quick understanding and navigation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "codeflow-mapper": "dist/index.js"
+    "codescope-mapper": "dist/index.js"
   },
   "files": [
     "dist",
@@ -35,11 +35,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/hassimalik/codeflow-mapper"
+    "url": "https://github.com/hassimalik/codescope-mapper"
   },
-  "homepage": "https://github.com/hassimalik/codeflow-mapper",
+  "homepage": "https://github.com/hassimalik/codescope-mapper",
   "bugs": {
-    "url": "https://github.com/hassimalik/codeflow-mapper/issues"
+    "url": "https://github.com/hassimalik/codescope-mapper/issues"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

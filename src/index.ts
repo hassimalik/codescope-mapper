@@ -61,10 +61,10 @@ function color(text: string, ...styles: readonly string[]): string {
 }
 
 function printUsage(): void {
-  console.log(`Codeflow Mapper
+  console.log(`Codescope Mapper
 
 Usage:
-  codeflow-mapper <repository-path> [options]
+  Codescope-mapper <repository-path> [options]
 
 Options:
   --graph                  Print the raw graph summary
