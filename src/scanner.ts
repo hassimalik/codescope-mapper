@@ -24,6 +24,8 @@ export async function scanRepository(directory: string): Promise<SourceFile[]> {
       withFileTypes: true,
     });
 
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+
     for (const entry of entries) {
       if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) {
         continue;
@@ -51,6 +53,10 @@ export async function scanRepository(directory: string): Promise<SourceFile[]> {
   }
 
   await walk(directory);
+
+  files.sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath),
+  );
 
   return files;
 }

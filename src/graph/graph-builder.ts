@@ -43,6 +43,9 @@ export async function buildCodeGraph(
     relationships: [],
   };
 
+  const seenNodes = new Set<string>();
+  const seenRelationships = new Set<string>();
+
   for (const file of parsedFiles) {
     const fileSymbol: CodeSymbol = {
       id: file.relativePath,
@@ -57,18 +60,28 @@ export async function buildCodeGraph(
       },
     };
 
-    graph.nodes.push(fileSymbol);
+    if (!seenNodes.has(fileSymbol.id)) {
+      seenNodes.add(fileSymbol.id);
+      graph.nodes.push(fileSymbol);
+    }
 
     const symbols = extractSymbols(file.ast, file.relativePath);
 
-    graph.nodes.push(...symbols);
-
     for (const symbol of symbols) {
-      graph.relationships.push({
-        from: fileSymbol.id,
-        to: symbol.id,
-        type: "CONTAINS",
-      });
+      if (!seenNodes.has(symbol.id)) {
+        seenNodes.add(symbol.id);
+        graph.nodes.push(symbol);
+      }
+
+      const relationshipKey = [fileSymbol.id, "CONTAINS", symbol.id].join("|");
+      if (!seenRelationships.has(relationshipKey)) {
+        seenRelationships.add(relationshipKey);
+        graph.relationships.push({
+          from: fileSymbol.id,
+          to: symbol.id,
+          type: "CONTAINS",
+        });
+      }
     }
   }
 
@@ -80,8 +93,29 @@ export async function buildCodeGraph(
       graph.nodes,
     );
 
-    graph.relationships.push(...relationships);
+    for (const relationship of relationships) {
+      const relationshipKey = [
+        relationship.from,
+        relationship.type,
+        relationship.to,
+      ].join("|");
+
+      if (seenRelationships.has(relationshipKey)) {
+        continue;
+      }
+
+      seenRelationships.add(relationshipKey);
+      graph.relationships.push(relationship);
+    }
   }
+
+  graph.nodes.sort((left, right) => left.id.localeCompare(right.id));
+  graph.relationships.sort((left, right) => {
+    const leftKey = [left.from, left.type, left.to].join("|");
+    const rightKey = [right.from, right.type, right.to].join("|");
+
+    return leftKey.localeCompare(rightKey);
+  });
 
   const validationErrors = validateCodeGraph(graph);
 

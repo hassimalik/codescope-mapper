@@ -1,16 +1,46 @@
 {
-  "name": "codebase-feature-mapper",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "codeflow-mapper",
+  "version": "0.1.0",
+  "description": "Maps JavaScript and TypeScript codebases into a feature-aware dependency graph for quick understanding and navigation.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "codeflow-mapper": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "tsx --test",
+    "prepack": "npm run build && npm test"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "codebase",
+    "feature-mapping",
+    "code-graph",
+    "dependency-map",
+    "typescript",
+    "javascript",
+    "architecture"
+  ],
+  "author": "Hassam Ali Khan",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hassimalik/codeflow-mapper"
+  },
+  "homepage": "https://github.com/hassimalik/codeflow-mapper",
+  "bugs": {
+    "url": "https://github.com/hassimalik/codeflow-mapper/issues"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.3",

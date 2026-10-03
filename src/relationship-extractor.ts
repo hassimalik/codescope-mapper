@@ -111,12 +111,6 @@ export function extractRelationships(
   }
 
   function handleExport(node: ts.ExportDeclaration) {
-    const exportClause = node.exportClause;
-
-    if (!exportClause || !ts.isNamedExports(exportClause)) {
-      return;
-    }
-
     const moduleSpecifier = node.moduleSpecifier;
 
     if (moduleSpecifier && !ts.isStringLiteral(moduleSpecifier)) {
@@ -127,6 +121,34 @@ export function extractRelationships(
       moduleSpecifier && ts.isStringLiteral(moduleSpecifier)
         ? resolveImport(moduleSpecifier.text, filePath, repositoryPath)
         : relativeFilePath;
+
+    if (moduleSpecifier && !node.exportClause) {
+      addRelationship({
+        from: relativeFilePath,
+        to: resolvedExport,
+        type: "IMPORTS",
+      });
+
+      for (const symbol of knownSymbols) {
+        if (symbol.location.file !== resolvedExport) {
+          continue;
+        }
+
+        addRelationship({
+          from: relativeFilePath,
+          to: symbol.id,
+          type: "EXPORTS",
+        });
+      }
+
+      return;
+    }
+
+    const exportClause = node.exportClause;
+
+    if (!exportClause || !ts.isNamedExports(exportClause)) {
+      return;
+    }
 
     for (const element of exportClause.elements) {
       const exportedName = element.name.text;
