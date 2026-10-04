@@ -14,35 +14,24 @@ It scans a repository, extracts files and symbols, builds a graph of imports, ca
 - Builds an in-memory `CodeGraph`
 - Aggregates graph data into a `FeatureMap` for quick understanding of feature areas
 
-## Install
-
-```bash
-npm install
-```
-
 ## Usage
 
 ```bash
-npm run dev -- /path/to/repository
+npx codescope-mapper -- /path/to/repository
 ```
 
-Or after building:
 
-```bash
-npm run build
-node dist/index.js /path/to/repository
-```
 
 ## CLI options
 
 ```bash
-codescope-mapper /path/to/repository --summary
-codescope-mapper /path/to/repository --graph
-codescope-mapper /path/to/repository --json
-codescope-mapper /path/to/repository --format text
-codescope-mapper /path/to/repository --max-depth 5
-codescope-mapper /path/to/repository --color always
-codescope-mapper --help
+npx codescope-mapper /path/to/repository --summary
+npx codescope-mapper /path/to/repository --graph
+npx codescope-mapper /path/to/repository --json
+npx codescope-mapper /path/to/repository --format text
+npx codescope-mapper /path/to/repository --max-depth 5
+npx codescope-mapper /path/to/repository --color always
+npx codescope-mapper --help
 ```
 
 ## Example output
