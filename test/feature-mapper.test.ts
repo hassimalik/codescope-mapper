@@ -2,8 +2,9 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import { buildFeatureMap } from "../src/feature-mapper.js";
+import type { CodeGraph } from "../src/graph/code-graph.js";
 
-const graph = {
+const graph: CodeGraph = {
   nodes: [
     {
       id: "src/app/page.ts",
