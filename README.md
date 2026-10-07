@@ -6,7 +6,8 @@ It scans a repository, extracts files and symbols, builds a graph of imports, ca
 
 ## What it does
 
-- Recursively scans a repository for `.js`, `.jsx`, `.ts`, and `.tsx` files
+- Recursively scans a repository for JavaScript and TypeScript files, including
+  `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts`
 - Ignores common irrelevant folders such as `node_modules`, `.git`, `dist`, `build`, and `coverage`
 - Parses source files with the TypeScript compiler API
 - Extracts functions (including identifier-assigned arrow and function

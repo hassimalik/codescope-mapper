@@ -1,5 +1,11 @@
 import { strict as assert } from "node:assert";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -779,5 +785,97 @@ export * from "./utils";
       recursive: true,
       force: true,
     });
+  }
+});
+
+test("resolves default imports by their exported symbol, not their local alias", () => {
+  const repositoryPath = mkdtempSync(
+    path.join(tmpdir(), "codebase-feature-mapper-"),
+  );
+
+  try {
+    const utilitiesDirectory = path.join(repositoryPath, "utilities");
+    const greetingPath = path.join(utilitiesDirectory, "index.ts");
+    const mainPath = path.join(repositoryPath, "main.ts");
+
+    mkdirSync(utilitiesDirectory);
+    writeFileSync(
+      greetingPath,
+      [
+        "export default function createGreeting() {",
+        '  return "Hello";',
+        "}",
+      ].join("\n"),
+    );
+    writeFileSync(
+      mainPath,
+      [
+        'import makeGreeting from "./utilities";',
+        "",
+        "export function main() {",
+        "  return makeGreeting();",
+        "}",
+      ].join("\n"),
+    );
+
+    const mainSourceFile = ts.createSourceFile(
+      mainPath,
+      readFileSync(mainPath, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const knownSymbols: CodeSymbol[] = [
+      {
+        id: "utilities/index.ts:createGreeting:1",
+        name: "createGreeting",
+        type: "function",
+        location: {
+          file: "utilities/index.ts",
+          startLine: 1,
+          startColumn: 1,
+          endLine: 3,
+          endColumn: 2,
+        },
+      },
+      {
+        id: "main.ts:main:3",
+        name: "main",
+        type: "function",
+        location: {
+          file: "main.ts",
+          startLine: 3,
+          startColumn: 1,
+          endLine: 5,
+          endColumn: 2,
+        },
+      },
+    ];
+
+    const relationships = extractRelationships(
+      mainSourceFile,
+      mainPath,
+      repositoryPath,
+      knownSymbols,
+    );
+
+    assert.ok(
+      relationships.some(
+        (relationship) =>
+          relationship.type === "CALLS" &&
+          relationship.from === "main.ts:main:3" &&
+          relationship.to === "utilities/index.ts:createGreeting:1",
+      ),
+    );
+    assert.ok(
+      relationships.some(
+        (relationship) =>
+          relationship.type === "REFERENCES" &&
+          relationship.from === "main.ts" &&
+          relationship.to === "utilities/index.ts:createGreeting:1",
+      ),
+    );
+  } finally {
+    rmSync(repositoryPath, { recursive: true, force: true });
   }
 });
