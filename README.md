@@ -43,7 +43,6 @@ Display a file by its repository-relative path:
 npx codescope-mapper -- /path/to/repository --file src/auth/AuthService.ts
 ```
 
-
 ## CLI options
 
 ```bash

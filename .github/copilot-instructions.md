@@ -15,15 +15,15 @@ CodeFlow Mapper is an open-source developer tool that analyzes JavaScript and Ty
 The long-term product goal is:
 
 Repository
-  ↓
+↓
 Static Analysis
-  ↓
+↓
 CodeGraph
-  ↓
+↓
 Feature Mapping
-  ↓
+↓
 FeatureMap
-  ↓
+↓
 Visualization / CLI / API
 
 Example user question:
@@ -33,17 +33,17 @@ Example user question:
 Potential result:
 
 LoginForm
-  ↓
+↓
 useAuth()
-  ↓
+↓
 AuthService.login()
-  ↓
+↓
 API route
-  ↓
+↓
 Controller
-  ↓
+↓
 Service
-  ↓
+↓
 Repository / Database
 
 The system must prioritize:
@@ -123,23 +123,23 @@ The core should be reusable by multiple future consumers.
 Target architecture:
 
 Repository
-  ↓
+↓
 Scanner
-  ↓
+↓
 Reader
-  ↓
+↓
 Parser
-  ↓
+↓
 Symbol Extractor
-  ↓
+↓
 Relationship Extractor
-  ↓
+↓
 CodeGraph
-  ↓
+↓
 Feature Mapper
-  ↓
+↓
 FeatureMap
-  ↓
+↓
 CLI / Web / API
 
 Do not reverse this dependency direction.
@@ -159,10 +159,10 @@ src/
 ├── symbol-extractor.ts
 ├── relationship-extractor.ts
 ├── types/
-│   └── relationship.ts
+│ └── relationship.ts
 └── graph/
-    ├── code-graph.ts
-    └── graph-builder.ts
+├── code-graph.ts
+└── graph-builder.ts
 
 The responsibilities are:
 
@@ -281,8 +281,8 @@ Defines the graph representation.
 Current conceptual model:
 
 CodeGraph
-  ├── nodes
-  └── relationships
+├── nodes
+└── relationships
 
 The CodeGraph is an intermediate representation.
 
@@ -444,15 +444,15 @@ Prioritize work in this order.
 Eventually:
 
 Feature Query
-  ↓
+↓
 Candidate Discovery
-  ↓
+↓
 Candidate Ranking
-  ↓
+↓
 Graph Traversal
-  ↓
+↓
 Relevant Path Extraction
-  ↓
+↓
 FeatureMap
 
 Feature mapping must initially favor deterministic/static-analysis signals.
