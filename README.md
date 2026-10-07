@@ -9,7 +9,8 @@ It scans a repository, extracts files and symbols, builds a graph of imports, ca
 - Recursively scans a repository for `.js`, `.jsx`, `.ts`, and `.tsx` files
 - Ignores common irrelevant folders such as `node_modules`, `.git`, `dist`, `build`, and `coverage`
 - Parses source files with the TypeScript compiler API
-- Extracts functions, classes, and variables
+- Extracts functions (including identifier-assigned arrow and function
+  expressions, class methods, and constructors), classes, and variables
 - Resolves local imports and symbol references
 - Builds an in-memory `CodeGraph`
 - Aggregates graph data into a `FeatureMap` for quick understanding of feature areas
@@ -24,6 +25,28 @@ npm install
 
 ```bash
 npm run dev -- /path/to/repository
+```
+
+Open the interactive file explorer:
+
+```bash
+npm run dev -- /path/to/repository --explore
+```
+
+Use the arrow keys to select files and audit views, and type in the file list
+to filter by path. Available per-file views include source, symbols,
+relationships, JSON, graph neighborhood, and the existing feature summary.
+
+Search repository-relative file paths:
+
+```bash
+npm run dev -- /path/to/repository --search auth
+```
+
+Display a file by its repository-relative path:
+
+```bash
+npm run dev -- /path/to/repository --file src/auth/AuthService.ts
 ```
 
 Or after building:
@@ -90,11 +113,14 @@ This project intentionally targets a practical subset of modern JavaScript and T
 - re-exports and `export *` patterns
 
 It is intentionally not a full compiler or exhaustive code-analysis engine.
+Calls through object receivers remain best-effort and may be ambiguous when
+multiple methods share a name.
 
 ## Development
 
 ```bash
 npm test
+npm run typecheck
 npm run build
 npm pack --dry-run
 ```

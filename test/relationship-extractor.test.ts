@@ -6,6 +6,7 @@ import { test } from "node:test";
 import ts from "typescript";
 
 import { extractRelationships } from "../src/relationship-extractor.js";
+import type { CodeSymbol } from "../src/symbol.js";
 
 test("extracts a CALLS relationship for same-file function calls", () => {
   const source = `

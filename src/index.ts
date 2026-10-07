@@ -2,8 +2,15 @@
 
 import { parseArgs } from "node:util";
 
+import { readRepositoryFile } from "./explorer/file-details.js";
+import { searchRepositoryFiles } from "./explorer/file-search.js";
+import { runInteractiveExplorer } from "./cli/interactive-explorer.js";
 import { buildFeatureMap } from "./feature-mapper.js";
-import { buildCodeGraph } from "./graph/graph-builder.js";
+import {
+  buildCodeGraph,
+  buildCodeGraphFromFiles,
+} from "./graph/graph-builder.js";
+import { scanRepository } from "./scanner.js";
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -29,6 +36,15 @@ const { values, positionals } = parseArgs({
     },
     "max-depth": {
       type: "string",
+    },
+    search: {
+      type: "string",
+    },
+    file: {
+      type: "string",
+    },
+    explore: {
+      type: "boolean",
     },
     color: {
       type: "string",
@@ -67,6 +83,9 @@ Usage:
   codescope-mapper <repository-path> [options]
 
 Options:
+  --explore                Open the interactive repository explorer
+  --search <query>         Search repository-relative file paths
+  --file <relative-path>   Display a repository file and its source text
   --graph                  Print the raw graph summary
   --summary                Print a feature-summary view (default)
   --json                   Output JSON instead of human-readable text
@@ -116,6 +135,67 @@ async function main(): Promise<void> {
   }
 
   const repositoryPath = positionals[0];
+
+  if (values.explore) {
+    if (
+      values.search !== undefined ||
+      values.file !== undefined ||
+      values.json ||
+      values.graph ||
+      values.summary ||
+      values.format !== undefined ||
+      values["max-depth"] !== undefined
+    ) {
+      throw new Error(
+        "--explore cannot be combined with other output options.",
+      );
+    }
+
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      throw new Error("--explore requires an interactive terminal.");
+    }
+
+    const files = await scanRepository(repositoryPath);
+    const graph = await buildCodeGraphFromFiles(repositoryPath, files);
+    const featureMap = buildFeatureMap(graph);
+    await runInteractiveExplorer(files, graph, featureMap);
+    return;
+  }
+
+  if (typeof values.search === "string" && typeof values.file === "string") {
+    throw new Error("--search and --file cannot be used together");
+  }
+
+  if (typeof values.search === "string") {
+    const files = await scanRepository(repositoryPath);
+    const results = searchRepositoryFiles(files, values.search);
+
+    if (results.length === 0) {
+      console.log("No matching files.");
+      return;
+    }
+
+    for (const result of results) {
+      console.log(result.relativePath);
+    }
+    return;
+  }
+
+  if (typeof values.file === "string") {
+    const files = await scanRepository(repositoryPath);
+    const details = await readRepositoryFile(files, values.file);
+
+    if (!details) {
+      throw new Error("No file found at that repository-relative path.");
+    }
+
+    console.log(`File: ${details.relativePath}`);
+    console.log(`Extension: ${details.extension}`);
+    console.log("");
+    console.log(details.content);
+    return;
+  }
+
   const maxDepth = Number(values["max-depth"] ?? "10");
   if (!Number.isInteger(maxDepth) || maxDepth < 1) {
     throw new Error("--max-depth must be a positive integer");
