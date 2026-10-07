@@ -15,22 +15,16 @@ It scans a repository, extracts files and symbols, builds a graph of imports, ca
 - Builds an in-memory `CodeGraph`
 - Aggregates graph data into a `FeatureMap` for quick understanding of feature areas
 
-## Install
-
-```bash
-npm install
-```
-
 ## Usage
 
 ```bash
-npm run dev -- /path/to/repository
+npx codescope-mapper -- /path/to/repository
 ```
 
 Open the interactive file explorer:
 
 ```bash
-npm run dev -- /path/to/repository --explore
+npx codescope-mapper -- /path/to/repository --explore
 ```
 
 Use the arrow keys to select files and audit views, and type in the file list
@@ -40,32 +34,26 @@ relationships, JSON, graph neighborhood, and the existing feature summary.
 Search repository-relative file paths:
 
 ```bash
-npm run dev -- /path/to/repository --search auth
+npx codescope-mapper -- /path/to/repository --search auth
 ```
 
 Display a file by its repository-relative path:
 
 ```bash
-npm run dev -- /path/to/repository --file src/auth/AuthService.ts
+npx codescope-mapper -- /path/to/repository --file src/auth/AuthService.ts
 ```
 
-Or after building:
-
-```bash
-npm run build
-node dist/index.js /path/to/repository
-```
 
 ## CLI options
 
 ```bash
-codescope-mapper /path/to/repository --summary
-codescope-mapper /path/to/repository --graph
-codescope-mapper /path/to/repository --json
-codescope-mapper /path/to/repository --format text
-codescope-mapper /path/to/repository --max-depth 5
-codescope-mapper /path/to/repository --color always
-codescope-mapper --help
+npx codescope-mapper /path/to/repository --summary
+npx codescope-mapper /path/to/repository --graph
+npx codescope-mapper /path/to/repository --json
+npx codescope-mapper /path/to/repository --format text
+npx codescope-mapper /path/to/repository --max-depth 5
+npx codescope-mapper /path/to/repository --color always
+npx codescope-mapper --help
 ```
 
 ## Example output
