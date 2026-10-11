@@ -15,6 +15,8 @@ interface NamespaceImportBinding {
   sourceFile: string;
 }
 
+const defaultExportNameCache = new Map<string, string | undefined>();
+
 export function extractRelationships(
   sourceFile: ts.SourceFile,
   filePath: string,
@@ -59,6 +61,14 @@ export function extractRelationships(
 
     if (ts.isExportDeclaration(node)) {
       handleExport(node);
+    }
+
+    if (ts.isExportAssignment(node)) {
+      handleDefaultExportAssignment(node);
+    }
+
+    if (isNamedDefaultExport(node)) {
+      handleNamedDefaultExport(node);
     }
 
     if (ts.isCallExpression(node)) {
@@ -107,6 +117,36 @@ export function extractRelationships(
         to: targetSymbol.id,
         type: "REFERENCES",
       });
+    }
+
+    const defaultImport = node.importClause?.name;
+    if (!defaultImport) {
+      return;
+    }
+
+    const defaultExportName = getDefaultExportedSymbolName(
+      resolvedImport,
+      repositoryPath,
+    );
+    if (!defaultExportName) {
+      return;
+    }
+
+    addExportReference(resolvedImport, defaultExportName);
+
+    function addExportReference(sourcePath: string, symbolName: string): void {
+      const targetSymbol = knownSymbols.find(
+        (symbol) =>
+          symbol.location.file === sourcePath && symbol.name === symbolName,
+      );
+
+      if (targetSymbol) {
+        addRelationship({
+          from: relativeFilePath,
+          to: targetSymbol.id,
+          type: "REFERENCES",
+        });
+      }
     }
   }
 
@@ -169,6 +209,41 @@ export function extractRelationships(
         type: "EXPORTS",
       });
     }
+  }
+
+  function handleDefaultExportAssignment(node: ts.ExportAssignment) {
+    if (node.isExportEquals || !ts.isIdentifier(node.expression)) {
+      return;
+    }
+
+    addExportForSymbol(relativeFilePath, node.expression.text);
+  }
+
+  function handleNamedDefaultExport(
+    node: ts.FunctionDeclaration | ts.ClassDeclaration,
+  ) {
+    if (!node.name) {
+      return;
+    }
+
+    addExportForSymbol(relativeFilePath, node.name.text);
+  }
+
+  function addExportForSymbol(sourcePath: string, symbolName: string): void {
+    const targetSymbol = knownSymbols.find(
+      (symbol) =>
+        symbol.location.file === sourcePath && symbol.name === symbolName,
+    );
+
+    if (!targetSymbol) {
+      return;
+    }
+
+    addRelationship({
+      from: relativeFilePath,
+      to: targetSymbol.id,
+      type: "EXPORTS",
+    });
   }
 
   function handleCall(node: ts.CallExpression) {
@@ -318,10 +393,14 @@ function getImportBindings(
     if (importClause.name) {
       const importedDefaultName = importClause.name.text;
 
+      const defaultExportName = getDefaultExportedSymbolName(
+        resolvedImport,
+        repositoryPath,
+      );
       const targetSymbol = knownSymbols.find(
         (symbol) =>
           symbol.location.file === resolvedImport &&
-          symbol.name === importedDefaultName,
+          symbol.name === (defaultExportName ?? importedDefaultName),
       );
 
       if (targetSymbol) {
@@ -529,20 +608,131 @@ function resolveImport(
     path.resolve(currentDirectory, importPath),
     path.resolve(currentDirectory, `${importPath}.ts`),
     path.resolve(currentDirectory, `${importPath}.tsx`),
+    path.resolve(currentDirectory, `${importPath}.mts`),
+    path.resolve(currentDirectory, `${importPath}.cts`),
     path.resolve(currentDirectory, `${importPath}.js`),
     path.resolve(currentDirectory, `${importPath}.jsx`),
+    path.resolve(currentDirectory, `${importPath}.mjs`),
+    path.resolve(currentDirectory, `${importPath}.cjs`),
     path.resolve(currentDirectory, `${importPath}.css`),
     path.resolve(currentDirectory, importPath, "index.ts"),
     path.resolve(currentDirectory, importPath, "index.tsx"),
+    path.resolve(currentDirectory, importPath, "index.mts"),
+    path.resolve(currentDirectory, importPath, "index.cts"),
     path.resolve(currentDirectory, importPath, "index.js"),
     path.resolve(currentDirectory, importPath, "index.jsx"),
+    path.resolve(currentDirectory, importPath, "index.mjs"),
+    path.resolve(currentDirectory, importPath, "index.cjs"),
   ];
 
   for (const possiblePath of possiblePaths) {
-    if (fs.existsSync(possiblePath)) {
+    if (isFile(possiblePath)) {
       return path.relative(repositoryPath, possiblePath);
     }
   }
 
   return importPath;
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function getDefaultExportedSymbolName(
+  relativePath: string,
+  repositoryPath: string,
+): string | undefined {
+  const absolutePath = path.resolve(repositoryPath, relativePath);
+
+  if (defaultExportNameCache.has(absolutePath)) {
+    return defaultExportNameCache.get(absolutePath);
+  }
+
+  if (!isFile(absolutePath)) {
+    defaultExportNameCache.set(absolutePath, undefined);
+    return undefined;
+  }
+
+  let source: string;
+  try {
+    source = fs.readFileSync(absolutePath, "utf8");
+  } catch {
+    defaultExportNameCache.set(absolutePath, undefined);
+    return undefined;
+  }
+
+  const sourceFile = ts.createSourceFile(
+    absolutePath,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+  );
+
+  for (const statement of sourceFile.statements) {
+    if (
+      (ts.isFunctionDeclaration(statement) ||
+        ts.isClassDeclaration(statement)) &&
+      statement.name &&
+      hasDefaultModifier(statement)
+    ) {
+      return cacheDefaultExportName(absolutePath, statement.name.text);
+    }
+
+    if (
+      ts.isExportAssignment(statement) &&
+      !statement.isExportEquals &&
+      ts.isIdentifier(statement.expression)
+    ) {
+      return cacheDefaultExportName(absolutePath, statement.expression.text);
+    }
+
+    if (
+      ts.isExportDeclaration(statement) &&
+      !statement.moduleSpecifier &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      const defaultExport = statement.exportClause.elements.find(
+        (element) => element.name.text === "default",
+      );
+
+      if (defaultExport) {
+        return cacheDefaultExportName(
+          absolutePath,
+          defaultExport.propertyName?.text ?? defaultExport.name.text,
+        );
+      }
+    }
+  }
+
+  defaultExportNameCache.set(absolutePath, undefined);
+  return undefined;
+}
+
+function cacheDefaultExportName(filePath: string, name: string): string {
+  defaultExportNameCache.set(filePath, name);
+  return name;
+}
+
+function isNamedDefaultExport(
+  node: ts.Node,
+): node is ts.FunctionDeclaration | ts.ClassDeclaration {
+  return (
+    (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+    node.name !== undefined &&
+    hasDefaultModifier(node)
+  );
+}
+
+function hasDefaultModifier(node: ts.Node): boolean {
+  return Boolean(
+    ts.canHaveModifiers(node) &&
+    ts
+      .getModifiers(node)
+      ?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword),
+  );
 }

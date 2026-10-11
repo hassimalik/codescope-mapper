@@ -3,7 +3,16 @@ import type { SourceFile } from "./types/source-file.js";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
-const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".ts", ".tsx"]);
+const SOURCE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+]);
 
 const IGNORED_DIRECTORIES = new Set([
   "node_modules",

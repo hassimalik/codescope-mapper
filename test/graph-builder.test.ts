@@ -1,121 +1,151 @@
 import { strict as assert } from "node:assert";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import { buildCodeGraph } from "../src/graph/graph-builder.js";
 
-test("builds a CodeGraph with file nodes, symbol nodes, and relationships", async () => {
-  const repositoryPath = mkdtempSync(
-    path.join(tmpdir(), "codebase-feature-mapper-"),
+const repositoryPath = path.resolve("test-fixtures/relationship-repository");
+
+test("builds repository-relative graph relationships from a fixture repository", async () => {
+  const graph = await buildCodeGraph(repositoryPath);
+  const findSymbol = (file: string, name: string) => {
+    const symbol = graph.nodes.find(
+      (node) =>
+        node.type !== "file" &&
+        node.location.file === file &&
+        node.name === name,
+    );
+
+    assert.ok(symbol, `Expected ${name} symbol in ${file}`);
+    return symbol;
+  };
+
+  const consumerPath = "src/consumer.ts";
+  const helpersPath = "src/helpers.ts";
+  const servicesPath = "src/services.ts";
+  const localTarget = findSymbol(helpersPath, "localTarget");
+  const sameFileTarget = findSymbol(consumerPath, "sameFileTarget");
+  const arrowTarget = findSymbol(consumerPath, "arrowTarget");
+  const arrowCaller = findSymbol(consumerPath, "arrowCaller");
+  const run = findSymbol(consumerPath, "run");
+  const importedReference = findSymbol(consumerPath, "importedReference");
+  const authService = findSymbol(servicesPath, "AuthService");
+  const login = findSymbol(servicesPath, "login");
+  const constructor = findSymbol(servicesPath, "constructor");
+
+  const relationshipKeys = graph.relationships.map((relationship) =>
+    [relationship.from, relationship.type, relationship.to].join("|"),
   );
 
-  try {
-    const appDirectory = path.join(repositoryPath, "app");
+  assert.equal(new Set(relationshipKeys).size, relationshipKeys.length);
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CONTAINS" &&
+        relationship.from === consumerPath &&
+        relationship.to === run.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CONTAINS" &&
+        relationship.from === authService.id &&
+        relationship.to === login.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CONTAINS" &&
+        relationship.from === authService.id &&
+        relationship.to === constructor.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CONTAINS" &&
+        relationship.from === consumerPath &&
+        relationship.to === importedReference.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CONTAINS" &&
+        relationship.from === helpersPath &&
+        relationship.to === localTarget.id,
+    ),
+  );
 
-    mkdirSync(appDirectory, {
-      recursive: true,
-    });
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CALLS" &&
+        relationship.from === run.id &&
+        relationship.to === sameFileTarget.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CALLS" &&
+        relationship.from === run.id &&
+        relationship.to === localTarget.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "CALLS" &&
+        relationship.from === arrowCaller.id &&
+        relationship.to === arrowTarget.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "REFERENCES" &&
+        relationship.from === consumerPath &&
+        relationship.to === localTarget.id,
+    ),
+  );
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "IMPORTS" &&
+        relationship.from === consumerPath &&
+        relationship.to === helpersPath,
+    ),
+  );
 
-    const greetingPath = path.join(appDirectory, "Greeting.ts");
-    const pagePath = path.join(appDirectory, "page.ts");
+  const sameFileCalls = graph.relationships.filter(
+    (relationship) =>
+      relationship.type === "CALLS" &&
+      relationship.from === run.id &&
+      relationship.to === sameFileTarget.id,
+  );
+  assert.equal(sameFileCalls.length, 1);
 
-    const greetingSource = `
-      export function getGreeting() {
-        return "Hello";
-      }
-    `;
+  assert.ok(
+    graph.relationships.some(
+      (relationship) =>
+        relationship.type === "IMPORTS" &&
+        relationship.from === consumerPath &&
+        relationship.to === "node:fs",
+    ),
+  );
+  assert.ok(!graph.nodes.some((node) => node.id === "node:fs"));
 
-    const pageSource = `
-      import { getGreeting } from "./Greeting";
-
-      export function Home() {
-        getGreeting();
-      }
-    `;
-
-    writeFileSync(greetingPath, greetingSource);
-    writeFileSync(pagePath, pageSource);
-
-    const graph = await buildCodeGraph(repositoryPath);
-
-    assert.equal(graph.nodes.length, 4);
-
+  for (const node of graph.nodes) {
     assert.ok(
-      graph.nodes.some(
-        (node) => node.id === "app/Greeting.ts" && node.type === "file",
-      ),
+      !node.id.startsWith("/"),
+      `Expected relative node ID: ${node.id}`,
     );
-
     assert.ok(
-      graph.nodes.some(
-        (node) => node.id === "app/page.ts" && node.type === "file",
-      ),
+      !node.location.file.startsWith("/"),
+      `Expected relative source path: ${node.location.file}`,
     );
-
-    assert.ok(
-      graph.nodes.some(
-        (node) =>
-          node.id === "app/Greeting.ts:getGreeting:2" &&
-          node.type === "function",
-      ),
-    );
-
-    assert.ok(
-      graph.nodes.some(
-        (node) => node.id === "app/page.ts:Home:4" && node.type === "function",
-      ),
-    );
-
-    assert.ok(
-      graph.relationships.some(
-        (relationship) =>
-          relationship.type === "CONTAINS" &&
-          relationship.from === "app/Greeting.ts" &&
-          relationship.to === "app/Greeting.ts:getGreeting:2",
-      ),
-    );
-
-    assert.ok(
-      graph.relationships.some(
-        (relationship) =>
-          relationship.type === "CONTAINS" &&
-          relationship.from === "app/page.ts" &&
-          relationship.to === "app/page.ts:Home:4",
-      ),
-    );
-
-    assert.ok(
-      graph.relationships.some(
-        (relationship) =>
-          relationship.type === "IMPORTS" &&
-          relationship.from === "app/page.ts" &&
-          relationship.to === "app/Greeting.ts",
-      ),
-    );
-
-    assert.ok(
-      graph.relationships.some(
-        (relationship) =>
-          relationship.type === "REFERENCES" &&
-          relationship.from === "app/page.ts" &&
-          relationship.to === "app/Greeting.ts:getGreeting:2",
-      ),
-    );
-
-    assert.ok(
-      graph.relationships.some(
-        (relationship) =>
-          relationship.type === "CALLS" &&
-          relationship.from === "app/page.ts:Home:4" &&
-          relationship.to === "app/Greeting.ts:getGreeting:2",
-      ),
-    );
-  } finally {
-    rmSync(repositoryPath, {
-      recursive: true,
-      force: true,
-    });
   }
 });

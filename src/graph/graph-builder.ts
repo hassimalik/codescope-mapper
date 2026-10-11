@@ -6,6 +6,7 @@ import { extractRelationships } from "../relationship-extractor.js";
 import { scanRepository } from "../scanner.js";
 import { CodeSymbol } from "../symbol.js";
 import { extractSymbols } from "../symbol-extractor.js";
+import { SourceFile } from "../types/source-file.js";
 import { CodeGraph } from "./code-graph.js";
 import { validateCodeGraph } from "./graph-validator.js";
 
@@ -20,9 +21,15 @@ export async function buildCodeGraph(
   repositoryPath: string,
 ): Promise<CodeGraph> {
   const absolutePath = path.resolve(repositoryPath);
-
   const files = await scanRepository(absolutePath);
+  return buildCodeGraphFromFiles(absolutePath, files);
+}
 
+export async function buildCodeGraphFromFiles(
+  repositoryPath: string,
+  files: SourceFile[],
+): Promise<CodeGraph> {
+  const absolutePath = path.resolve(repositoryPath);
   const parsedFiles: ParsedFile[] = [];
 
   for (const file of files) {
@@ -81,6 +88,23 @@ export async function buildCodeGraph(
           to: symbol.id,
           type: "CONTAINS",
         });
+      }
+
+      if (symbol.parentId) {
+        const parentRelationshipKey = [
+          symbol.parentId,
+          "CONTAINS",
+          symbol.id,
+        ].join("|");
+
+        if (!seenRelationships.has(parentRelationshipKey)) {
+          seenRelationships.add(parentRelationshipKey);
+          graph.relationships.push({
+            from: symbol.parentId,
+            to: symbol.id,
+            type: "CONTAINS",
+          });
+        }
       }
     }
   }

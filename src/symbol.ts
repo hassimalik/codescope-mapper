@@ -14,4 +14,5 @@ export interface CodeSymbol {
   name: string;
   type: SymbolType;
   location: SourceLocation;
+  parentId?: string;
 }

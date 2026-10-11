@@ -17,6 +17,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "tsx --test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "prepack": "npm run build && npm test"
   },
   "keywords": [
