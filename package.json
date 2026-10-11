@@ -1,6 +1,6 @@
 {
   "name": "codescope-mapper",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Maps JavaScript and TypeScript codebases into a feature-aware dependency graph for quick understanding and navigation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
