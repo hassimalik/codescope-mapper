@@ -176,3 +176,13 @@ npm pack --dry-run
 Contributions should include focused tests for behavior changes and keep
 analysis claims traceable to the source graph. Do not publish package changes
 as part of local development.
+
+## Maintainer release
+
+Releases are published manually from the `main` branch using the
+`Publish to npm` GitHub Actions workflow. Configure npm trusted publishing for
+the `hassimalik/codescope-mapper` repository and the
+`.github/workflows/publish.yml` workflow file. After updating the package
+version on `main`, run the workflow from GitHub Actions. It type-checks, builds,
+tests, and publishes through npm's short-lived OIDC authentication; no npm
+publish token is stored in GitHub.
