@@ -25,13 +25,47 @@ const IGNORED_DIRECTORIES = new Set([
 
 const IGNORED_FILES = new Set(["next-env.d.ts"]);
 
+export interface RepositoryScan {
+  files: SourceFile[];
+  directories: string[];
+  unreadableDirectories: string[];
+}
+
 export async function scanRepository(directory: string): Promise<SourceFile[]> {
+  const scan = await scanRepositoryTree(directory);
+  return scan.files;
+}
+
+export async function scanRepositoryTree(
+  directory: string,
+): Promise<RepositoryScan> {
   const files: SourceFile[] = [];
+  const directories: string[] = [];
+  const unreadableDirectories: string[] = [];
 
   async function walk(currentDirectory: string): Promise<void> {
-    const entries = await readdir(currentDirectory, {
-      withFileTypes: true,
-    });
+    let entries;
+    try {
+      entries = await readdir(currentDirectory, {
+        withFileTypes: true,
+      });
+    } catch (error) {
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? error.code
+          : undefined;
+      if (
+        currentDirectory !== directory &&
+        (code === "EACCES" || code === "EPERM")
+      ) {
+        unreadableDirectories.push(
+          toRepositoryPath(directory, currentDirectory),
+        );
+        return;
+      }
+
+      throw error;
+    }
 
     entries.sort((left, right) => left.name.localeCompare(right.name));
 
@@ -47,6 +81,7 @@ export async function scanRepository(directory: string): Promise<SourceFile[]> {
       const fullPath = path.join(currentDirectory, entry.name);
 
       if (entry.isDirectory()) {
+        directories.push(toRepositoryPath(directory, fullPath));
         await walk(fullPath);
         continue;
       }
@@ -54,7 +89,7 @@ export async function scanRepository(directory: string): Promise<SourceFile[]> {
       if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
         files.push({
           path: fullPath,
-          relativePath: path.relative(directory, fullPath),
+          relativePath: toRepositoryPath(directory, fullPath),
           extension: path.extname(fullPath),
         });
       }
@@ -67,5 +102,16 @@ export async function scanRepository(directory: string): Promise<SourceFile[]> {
     left.relativePath.localeCompare(right.relativePath),
   );
 
-  return files;
+  directories.sort((left, right) => left.localeCompare(right));
+  unreadableDirectories.sort((left, right) => left.localeCompare(right));
+
+  return {
+    files,
+    directories,
+    unreadableDirectories,
+  };
+}
+
+function toRepositoryPath(repositoryPath: string, filePath: string): string {
+  return path.relative(repositoryPath, filePath).split(path.sep).join("/");
 }

@@ -1,8 +1,14 @@
 import { strict as assert } from "node:assert";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { buildCodeGraph } from "../src/graph/graph-builder.js";
+import {
+  buildCodeGraph,
+  buildCodeGraphFromFiles,
+} from "../src/graph/graph-builder.js";
+import type { SourceFile } from "../src/types/source-file.js";
 
 const repositoryPath = path.resolve("test-fixtures/relationship-repository");
 
@@ -147,5 +153,48 @@ test("builds repository-relative graph relationships from a fixture repository",
       !node.location.file.startsWith("/"),
       `Expected relative source path: ${node.location.file}`,
     );
+  }
+});
+
+test("allows the explorer to skip and report files that cannot be read", async () => {
+  const repositoryPath = mkdtempSync(
+    path.join(tmpdir(), "codebase-feature-mapper-"),
+  );
+  const readablePath = path.join(repositoryPath, "readable.ts");
+  writeFileSync(readablePath, "export function ready() {}\n");
+
+  const files: SourceFile[] = [
+    {
+      path: path.join(repositoryPath, "missing.ts"),
+      relativePath: "missing.ts",
+      extension: ".ts",
+    },
+    {
+      path: readablePath,
+      relativePath: "readable.ts",
+      extension: ".ts",
+    },
+  ];
+  const failures: string[] = [];
+
+  try {
+    const graph = await buildCodeGraphFromFiles(
+      repositoryPath,
+      files,
+      (file, error) => {
+        failures.push(
+          `${file.relativePath}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
+
+    assert.deepEqual(
+      failures.map((failure) => failure.split(":")[0]),
+      ["missing.ts"],
+    );
+    assert.ok(graph.nodes.some((node) => node.id === "readable.ts"));
+    assert.ok(!graph.nodes.some((node) => node.id === "missing.ts"));
+  } finally {
+    rmSync(repositoryPath, { recursive: true, force: true });
   }
 });

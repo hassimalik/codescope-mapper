@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import path from "node:path";
 import { parseArgs } from "node:util";
 
+import { Terminal, type ColorMode } from "./cli/terminal.js";
 import { readRepositoryFile } from "./explorer/file-details.js";
 import { searchRepositoryFiles } from "./explorer/file-search.js";
 import { runInteractiveExplorer } from "./cli/interactive-explorer.js";
@@ -10,7 +12,7 @@ import {
   buildCodeGraph,
   buildCodeGraphFromFiles,
 } from "./graph/graph-builder.js";
-import { scanRepository } from "./scanner.js";
+import { scanRepository, scanRepositoryTree } from "./scanner.js";
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -51,81 +53,129 @@ const { values, positionals } = parseArgs({
       choices: ["auto", "always", "never"],
       default: "auto",
     },
+    "no-color": {
+      type: "boolean",
+    },
   },
 });
 
-type ColorMode = "auto" | "always" | "never";
-
-const colorMode = values.color as ColorMode;
-const useColor =
-  colorMode === "always" ||
-  (colorMode === "auto" &&
-    Boolean(process.stdout.isTTY) &&
-    !process.env.NO_COLOR);
-
-const ansi = {
-  reset: "\u001B[0m",
-  bold: "\u001B[1m",
-  cyan: "\u001B[36m",
-  green: "\u001B[32m",
-  yellow: "\u001B[33m",
-  red: "\u001B[31m",
-} as const;
-
-function color(text: string, ...styles: readonly string[]): string {
-  return useColor ? `${styles.join("")}${text}${ansi.reset}` : text;
-}
+const colorMode: ColorMode = values["no-color"]
+  ? "never"
+  : (values.color as ColorMode);
+const terminal = new Terminal(colorMode, process.stdout);
+const errorTerminal = new Terminal(colorMode, process.stderr);
 
 function printUsage(): void {
-  console.log(`codescope Mapper
+  console.log(`${terminal.heading("CodeScope Mapper")}
 
 Usage:
   codescope-mapper <repository-path> [options]
 
-Options:
-  --explore                Open the interactive repository explorer
+By default, scans the repository and prints a summary of directory-derived
+code groups. These groups describe code structure, not business features.
+
+Explore a repository:
+  --explore                Browse directories and inspect source files (TTY required)
   --search <query>         Search repository-relative file paths
   --file <relative-path>   Display a repository file and its source text
-  --graph                  Print the raw graph summary
-  --summary                Print a feature-summary view (default)
-  --json                   Output JSON instead of human-readable text
-  --format <text|json>     Select output format
-  --max-depth <number>     Limit feature traversal depth in summary output
-  --color <mode>           Use color: auto (default), always, or never
+
+Map a repository:
+  --summary                Print the code-group summary (default)
+  --graph                  Print graph nodes and all relationships
+  --json, -j               Output analysis data as JSON
+  --format <text|json>     Select the summary or JSON output format
+  --max-depth <number>     Limit how many code groups are listed
+
+Display:
+  --color <mode>           Color mode: auto (default), always, or never
+  --no-color               Disable color (also respects NO_COLOR)
   -h, --help               Show this help text
+
+Examples:
+  codescope-mapper /path/to/repository
+  codescope-mapper . --explore
+  codescope-mapper . --search CodeGraph
+  codescope-mapper . --graph
+  codescope-mapper . --json
+  codescope-mapper . --file src/auth/service.ts
+
+Explorer keys:
+  ↑/↓ move  Enter open  / search  Backspace parent  Esc back  q quit
+
+--search matches repository-relative file paths, not symbol contents.
+For scripts without a TTY, use --search or --file instead of --explore.
 `);
 }
 
 function printFeatureSummary(
   featureMap: ReturnType<typeof buildFeatureMap>,
+  graph: Awaited<ReturnType<typeof buildCodeGraph>>,
+  repositoryPath: string,
   maxDepth: number,
 ): void {
-  console.log(`\n${color("Feature map summary", ansi.bold, ansi.cyan)}`);
-  console.log(
-    `${color("Features:", ansi.bold)} ${color(String(featureMap.summary.totalFeatures), ansi.green)}`,
-  );
-  console.log(
-    `${color("Files:", ansi.bold)} ${color(String(featureMap.summary.totalFiles), ansi.green)}`,
-  );
-  console.log(
-    `${color("Symbols:", ansi.bold)} ${color(String(featureMap.summary.totalSymbols), ansi.green)}`,
-  );
-  console.log(
-    `${color("Feature relationships:", ansi.bold)} ${color(String(featureMap.summary.totalFeatureRelationships), ansi.green)}`,
-  );
+  const visibleGroups = featureMap.features.slice(0, maxDepth);
 
-  const visibleFeatures = featureMap.features.slice(0, Math.max(1, maxDepth));
+  console.log(`\n${terminal.heading("CodeScope Mapper")}`);
+  console.log(`${terminal.muted("=".repeat("CodeScope Mapper".length))}\n`);
+  console.log(`${terminal.label("Repository:")} ${repositoryPath}\n`);
+  console.log(terminal.heading("ANALYSIS OVERVIEW"));
+  printMetric(
+    "Source files analyzed",
+    graph.nodes.filter((node) => node.type === "file").length,
+  );
+  printMetric(
+    "Symbols discovered",
+    graph.nodes.filter((node) => node.type !== "file").length,
+  );
+  printMetric("Relationships found", graph.relationships.length);
+  printMetric("Code groups detected", featureMap.features.length);
 
-  for (const feature of visibleFeatures) {
-    console.log(
-      `\n${color("•", ansi.yellow)} ${color(feature.name, ansi.bold, ansi.cyan)}`,
+  console.log(`\n${terminal.heading("CODE GROUPS")}`);
+  if (visibleGroups.length === 0) {
+    console.log(`\n  ${terminal.muted("No code groups found.")}`);
+  }
+
+  for (const group of visibleGroups) {
+    console.log(`\n  ${terminal.heading(group.name)}`);
+    console.log(`    ${terminal.label("Files:")} ${group.files.length}`);
+    console.log(`    ${terminal.label("Symbols:")} ${group.symbols.length}`);
+
+    const relatedGroups = group.relationships.map(
+      (relationship) =>
+        `${formatRelationshipType(relationship.type)} -> ${relationship.to}`,
     );
-    console.log(`  ${color("files:", ansi.bold)} ${feature.files.length}`);
-    console.log(`  ${color("symbols:", ansi.bold)} ${feature.symbols.length}`);
     console.log(
-      `  ${color("related features:", ansi.bold)} ${feature.relationships.map((relationship) => relationship.to).join(", ") || color("none", ansi.yellow)}`,
+      `    ${terminal.label("Related groups:")} ${relatedGroups.join(", ") || terminal.muted("none")}`,
     );
   }
+
+  if (visibleGroups.length < featureMap.features.length) {
+    console.log(
+      `\n  ${terminal.muted(`Showing ${visibleGroups.length} of ${featureMap.features.length} groups; use --max-depth to change this limit.`)}`,
+    );
+  }
+
+  console.log(`\n${terminal.heading("NEXT STEPS")}`);
+  console.log("  Use --graph to inspect graph nodes and relationships.");
+  console.log("  Use --json to export the analysis results.");
+}
+
+function printMetric(label: string, count: number): void {
+  console.log(
+    `  ${terminal.label(`${label.padEnd(23)}:`)} ${terminal.success(String(count))}`,
+  );
+}
+
+function formatRelationshipType(type: string): string {
+  const labels: Record<string, string> = {
+    IMPORTS: "Imports",
+    CONTAINS: "Contains",
+    REFERENCES: "References",
+    CALLS: "Calls",
+    EXPORTS: "Exports",
+  };
+
+  return labels[type] ?? type;
 }
 
 async function main(): Promise<void> {
@@ -155,10 +205,30 @@ async function main(): Promise<void> {
       throw new Error("--explore requires an interactive terminal.");
     }
 
-    const files = await scanRepository(repositoryPath);
-    const graph = await buildCodeGraphFromFiles(repositoryPath, files);
+    const repositoryScan = await scanRepositoryTree(repositoryPath);
+    const unreadableFiles: string[] = [];
+    const graph = await buildCodeGraphFromFiles(
+      repositoryPath,
+      repositoryScan.files,
+      (file, error) => {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? error.code
+            : undefined;
+        unreadableFiles.push(
+          `${file.relativePath} (${typeof code === "string" ? code : "read error"})`,
+        );
+      },
+    );
     const featureMap = buildFeatureMap(graph);
-    await runInteractiveExplorer(files, graph, featureMap);
+    await runInteractiveExplorer(
+      repositoryScan.files,
+      graph,
+      featureMap,
+      terminal,
+      repositoryScan.directories,
+      [...repositoryScan.unreadableDirectories, ...unreadableFiles],
+    );
     return;
   }
 
@@ -171,12 +241,12 @@ async function main(): Promise<void> {
     const results = searchRepositoryFiles(files, values.search);
 
     if (results.length === 0) {
-      console.log("No matching files.");
+      console.log(terminal.warning("No matching files."));
       return;
     }
 
     for (const result of results) {
-      console.log(result.relativePath);
+      console.log(`${terminal.success("•")} ${result.relativePath}`);
     }
     return;
   }
@@ -189,8 +259,8 @@ async function main(): Promise<void> {
       throw new Error("No file found at that repository-relative path.");
     }
 
-    console.log(`File: ${details.relativePath}`);
-    console.log(`Extension: ${details.extension}`);
+    console.log(`${terminal.label("File:")} ${details.relativePath}`);
+    console.log(`${terminal.label("Extension:")} ${details.extension}`);
     console.log("");
     console.log(details.content);
     return;
@@ -223,34 +293,42 @@ async function main(): Promise<void> {
   }
 
   if (values.graph) {
-    console.log(`\n${color("CodeGraph", ansi.bold, ansi.cyan)}`);
+    console.log(`\n${terminal.heading("CODE NODES")}`);
 
     for (const node of graph.nodes) {
-      console.log(`  ${color(`${node.type}:`, ansi.bold)} ${node.name}`);
+      console.log(
+        `  ${terminal.label(`${node.type}:`)} ${node.name} ${terminal.muted(`[${node.id}]`)}`,
+      );
     }
 
+    console.log(`\n${terminal.heading("CODE RELATIONSHIPS")}`);
     for (const relationship of graph.relationships) {
       console.log(
-        `  ${color(`${relationship.type}:`, ansi.yellow)} ${relationship.from} → ${relationship.to}`,
+        `  ${terminal.warning(`${formatRelationshipType(relationship.type)}:`)} ${relationship.from} -> ${relationship.to}`,
       );
     }
 
     console.log(
-      `\n${color("Nodes:", ansi.bold)} ${color(String(graph.nodes.length), ansi.green)}`,
+      `\n${terminal.label("Nodes:")} ${terminal.success(String(graph.nodes.length))}`,
     );
     console.log(
-      `${color("Relationships:", ansi.bold)} ${color(String(graph.relationships.length), ansi.green)}`,
+      `${terminal.label("Relationships:")} ${terminal.success(String(graph.relationships.length))}`,
     );
     return;
   }
 
-  printFeatureSummary(featureMap, maxDepth);
+  printFeatureSummary(
+    featureMap,
+    graph,
+    path.resolve(repositoryPath),
+    maxDepth,
+  );
 }
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(
-    `${color("Failed to map repository:", ansi.bold, ansi.red)} ${message}`,
+    `${errorTerminal.error("Failed to map repository:")} ${message}`,
   );
   process.exit(1);
 });

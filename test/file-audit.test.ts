@@ -30,6 +30,19 @@ test("builds a repository-relative audit with linked graph nodes and feature dat
         relationship.from === "src/consumer.ts:run:16",
     ),
   );
+  assert.equal(
+    audit.relationships.length,
+    graph.relationships.filter((relationship) => {
+      const auditedIds = new Set([
+        audit.file.relativePath,
+        ...audit.symbols.map((symbol) => symbol.id),
+      ]);
+
+      return (
+        auditedIds.has(relationship.from) || auditedIds.has(relationship.to)
+      );
+    }).length,
+  );
   assert.ok(audit.graphNodes.some((node) => node.id === "src/consumer.ts"));
   assert.ok(audit.feature?.files.includes("src/helpers.ts"));
 
