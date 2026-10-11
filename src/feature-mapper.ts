@@ -80,60 +80,49 @@ export function buildFeatureMap(graph: CodeGraph): FeatureMap {
   }
 
   for (const relationship of graph.relationships) {
+    const fromNode = graph.nodes.find((node) => node.id === relationship.from);
+    const toNode = graph.nodes.find((node) => node.id === relationship.to);
+
+    if (!fromNode || !toNode || relationship.type === "CONTAINS") {
+      continue;
+    }
+
     const fromFeature = deriveFeatureName(
-      getNodeFeatureKey(relationship.from, graph),
+      fromNode.type === "file" ? fromNode.name : fromNode.location.file,
     );
     const toFeature = deriveFeatureName(
-      getNodeFeatureKey(relationship.to, graph),
+      toNode.type === "file" ? toNode.name : toNode.location.file,
     );
 
-    if (!fromFeature || !toFeature || fromFeature === toFeature) {
+    if (fromFeature === toFeature) {
       continue;
     }
 
     const relationshipType = relationship.type as FeatureRelationshipType;
 
-    if (relationship.type === "CONTAINS") {
+    const sourceFeature = featureMap.get(fromFeature);
+    const targetFeature = featureMap.get(toFeature);
+
+    if (!sourceFeature || !targetFeature) {
       continue;
     }
 
-    const sourceFeature = featureMap.get(fromFeature) ?? {
-      id: fromFeature,
-      name: fromFeature,
-      files: [],
-      symbols: [],
-      relationships: [],
-    };
-    const targetFeature = featureMap.get(toFeature) ?? {
-      id: toFeature,
-      name: toFeature,
-      files: [],
-      symbols: [],
-      relationships: [],
-    };
-
-    const incoming = {
+    const featureRelationship = {
       from: sourceFeature.id,
       to: targetFeature.id,
       type: relationshipType,
     };
 
-    const relationshipKey = [incoming.from, incoming.type, incoming.to].join(
-      "|",
-    );
     if (
       !sourceFeature.relationships.some(
         (item) =>
-          item.from === incoming.from &&
-          item.type === incoming.type &&
-          item.to === incoming.to,
+          item.from === featureRelationship.from &&
+          item.type === featureRelationship.type &&
+          item.to === featureRelationship.to,
       )
     ) {
-      sourceFeature.relationships.push(incoming);
+      sourceFeature.relationships.push(featureRelationship);
     }
-
-    featureMap.set(fromFeature, sourceFeature);
-    featureMap.set(toFeature, targetFeature);
   }
 
   const features = Array.from(featureMap.values())
@@ -151,22 +140,13 @@ export function buildFeatureMap(graph: CodeGraph): FeatureMap {
         ...feature,
         files: Array.from(new Set(feature.files)).sort(),
         symbols: Array.from(new Set(feature.symbols)).sort(),
-        relationships: uniqueRelationships
-          .filter(
-            (relationship) =>
-              relationship.from !== "root" &&
-              relationship.from !== "src" &&
-              relationship.to !== "root" &&
-              relationship.to !== "src",
-          )
-          .sort((left, right) =>
-            [left.from, left.type, left.to]
-              .join("|")
-              .localeCompare([right.from, right.type, right.to].join("|")),
-          ),
+        relationships: uniqueRelationships.sort((left, right) =>
+          [left.from, left.type, left.to]
+            .join("|")
+            .localeCompare([right.from, right.type, right.to].join("|")),
+        ),
       };
     })
-    .filter((feature) => feature.name !== "root" && feature.name !== "src")
     .sort((left, right) => left.name.localeCompare(right.name));
 
   return {
@@ -187,27 +167,6 @@ export function buildFeatureMap(graph: CodeGraph): FeatureMap {
       ),
     },
   };
-}
-
-function getNodeFeatureKey(nodeId: string, graph: CodeGraph): string {
-  const node = graph.nodes.find((entry) => entry.id === nodeId);
-
-  if (node) {
-    return node.type === "file" ? node.name : node.location.file;
-  }
-
-  if (
-    nodeId.startsWith("node:") ||
-    nodeId.startsWith("./") ||
-    nodeId.startsWith("../") ||
-    nodeId === "." ||
-    nodeId === ".." ||
-    nodeId.includes(":")
-  ) {
-    return "";
-  }
-
-  return nodeId;
 }
 
 function deriveFeatureName(filePath: string): string {

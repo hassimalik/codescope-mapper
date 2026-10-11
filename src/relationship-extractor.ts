@@ -26,7 +26,7 @@ export function extractRelationships(
   const relationships: CodeRelationship[] = [];
   const relationshipKeys = new Set<string>();
 
-  const relativeFilePath = path.relative(repositoryPath, filePath);
+  const relativeFilePath = toRepositoryPath(repositoryPath, filePath);
 
   const importBindings = getImportBindings(
     sourceFile,
@@ -627,11 +627,15 @@ function resolveImport(
 
   for (const possiblePath of possiblePaths) {
     if (isFile(possiblePath)) {
-      return path.relative(repositoryPath, possiblePath);
+      return toRepositoryPath(repositoryPath, possiblePath);
     }
   }
 
   return importPath;
+}
+
+function toRepositoryPath(repositoryPath: string, filePath: string): string {
+  return path.relative(repositoryPath, filePath).split(path.sep).join("/");
 }
 
 function isFile(filePath: string): boolean {

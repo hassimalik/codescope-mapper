@@ -28,12 +28,23 @@ export async function buildCodeGraph(
 export async function buildCodeGraphFromFiles(
   repositoryPath: string,
   files: SourceFile[],
+  onReadError?: (file: SourceFile, error: unknown) => void,
 ): Promise<CodeGraph> {
   const absolutePath = path.resolve(repositoryPath);
   const parsedFiles: ParsedFile[] = [];
 
   for (const file of files) {
-    const source = await readSourceFile(file);
+    let source: string;
+    try {
+      source = await readSourceFile(file);
+    } catch (error) {
+      if (!onReadError) {
+        throw error;
+      }
+
+      onReadError(file, error);
+      continue;
+    }
 
     const ast = parseSourceFile(file.path, source);
 

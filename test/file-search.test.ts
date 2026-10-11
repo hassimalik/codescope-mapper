@@ -113,6 +113,37 @@ test("returns no results when nothing matches", () => {
   assert.deepEqual(searchRepositoryFiles(files, "billing"), []);
 });
 
+test("ranks an exact filename above other partial path matches and keeps duplicate paths", () => {
+  const duplicateFiles: SourceFile[] = [
+    {
+      path: "/private/repository/src/legacy/AuthService.ts",
+      relativePath: "src/legacy/AuthService.ts",
+      extension: ".ts",
+    },
+    {
+      path: "/private/repository/src/auth/AuthService.ts",
+      relativePath: "src/auth/AuthService.ts",
+      extension: ".ts",
+    },
+    {
+      path: "/private/repository/src/misc/backup-AuthService.ts",
+      relativePath: "src/misc/backup-AuthService.ts",
+      extension: ".ts",
+    },
+  ];
+
+  assert.deepEqual(
+    searchRepositoryFiles(duplicateFiles, "AuthService.ts").map(
+      (result) => result.relativePath,
+    ),
+    [
+      "src/auth/AuthService.ts",
+      "src/legacy/AuthService.ts",
+      "src/misc/backup-AuthService.ts",
+    ],
+  );
+});
+
 test("returns only relative paths and extensions, not filesystem paths", () => {
   const results = searchRepositoryFiles(files, "auth");
 
